@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/reangeline/missale-backend/internal/core/domain"
 )
 
 func TestDecideRetriesServerErrorsAndSendsFixedModel(t *testing.T) {
@@ -30,9 +32,9 @@ func TestDecideRetriesServerErrorsAndSendsFixedModel(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("k", "typesafe/jev-1.13")
+	c := newClient("k", "typesafe/jev-1.13")
 	c.url = srv.URL
-	answers, err := c.Decide(context.Background(), "texto", map[string]Question{"risk": {Type: "noul", Instructions: "q"}})
+	answers, err := c.Decide(context.Background(), "texto", map[string]domain.Question{"risk": {Type: "noul", Instructions: "q"}})
 	if err != nil || calls != 2 || string(answers) != `{"risk":{"type":"noul","noul":0.9}}` {
 		t.Fatalf("answers=%s err=%v calls=%d", answers, err, calls)
 	}
@@ -45,7 +47,7 @@ func TestDecideDoesNotRetryClientErrors(t *testing.T) {
 		w.WriteHeader(400)
 	}))
 	defer srv.Close()
-	c := NewClient("k", "m")
+	c := newClient("k", "m")
 	c.url = srv.URL
 	if _, err := c.Decide(context.Background(), "x", nil); err == nil || calls != 1 {
 		t.Fatalf("err=%v calls=%d", err, calls)

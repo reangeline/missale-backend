@@ -1,4 +1,5 @@
-package auth
+// Package jwks caches the RSA signing keys published by Apple and Cognito.
+package jwks
 
 import (
 	"context"
@@ -27,7 +28,7 @@ type JWKS struct {
 
 const jwksTTL = time.Hour
 
-func NewJWKS(url string) *JWKS {
+func New(url string) *JWKS {
 	return &JWKS{url: url, client: &http.Client{Timeout: 10 * time.Second}}
 }
 

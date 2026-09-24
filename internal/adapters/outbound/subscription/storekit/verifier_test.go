@@ -1,4 +1,4 @@
-package subscription
+package storekit
 
 import (
 	"crypto/ecdsa"
@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/reangeline/missale-backend/internal/core/domain"
 )
 
 var now = time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
@@ -68,7 +70,7 @@ func newChain(t *testing.T, markers bool) chain {
 	return chain{root: root, leafKey: leafKey, leafDER: leafDER, intermediate: interDER}
 }
 
-func (c chain) sign(t *testing.T, tx Transaction) string {
+func (c chain) sign(t *testing.T, tx domain.SubscriptionTransaction) string {
 	t.Helper()
 	enc := func(v any) string { b, _ := json.Marshal(v); return base64.RawURLEncoding.EncodeToString(b) }
 	header := enc(map[string]any{"alg": "ES256", "x5c": []string{
@@ -85,15 +87,15 @@ func (c chain) sign(t *testing.T, tx Transaction) string {
 	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
 
-func verifierTrusting(root *x509.Certificate) *Verifier {
+func verifierTrusting(root *x509.Certificate) *verifier {
 	pool := x509.NewCertPool()
 	pool.AddCert(root)
-	return &Verifier{roots: pool, bundleID: "com.holymessages.app", productIDs: []string{"mensal", "anual"},
+	return &verifier{roots: pool, bundleID: "com.holymessages.app", productIDs: []string{"mensal", "anual"},
 		now: func() time.Time { return now }}
 }
 
-func activeTx() Transaction {
-	return Transaction{BundleID: "com.holymessages.app", ProductID: "anual", OriginalTransactionID: "1",
+func activeTx() domain.SubscriptionTransaction {
+	return domain.SubscriptionTransaction{BundleID: "com.holymessages.app", ProductID: "anual", OriginalTransactionID: "1",
 		ExpiresDate: now.Add(7 * 24 * time.Hour).UnixMilli(), Environment: "Sandbox"}
 }
 
@@ -111,17 +113,17 @@ func TestVerifyAcceptsActiveSubscription(t *testing.T) {
 func TestVerifyRejectsInactiveOrForeignTransactions(t *testing.T) {
 	c := newChain(t, true)
 	v := verifierTrusting(c.root)
-	cases := map[string]func(*Transaction){
-		"expired":       func(tx *Transaction) { tx.ExpiresDate = now.Add(-time.Minute).UnixMilli() },
-		"revoked":       func(tx *Transaction) { tx.RevocationDate = now.UnixMilli() },
-		"other bundle":  func(tx *Transaction) { tx.BundleID = "com.other.app" },
-		"other product": func(tx *Transaction) { tx.ProductID = "vitalicio" },
+	cases := map[string]func(*domain.SubscriptionTransaction){
+		"expired":       func(tx *domain.SubscriptionTransaction) { tx.ExpiresDate = now.Add(-time.Minute).UnixMilli() },
+		"revoked":       func(tx *domain.SubscriptionTransaction) { tx.RevocationDate = now.UnixMilli() },
+		"other bundle":  func(tx *domain.SubscriptionTransaction) { tx.BundleID = "com.other.app" },
+		"other product": func(tx *domain.SubscriptionTransaction) { tx.ProductID = "vitalicio" },
 	}
 	for name, mutate := range cases {
 		tx := activeTx()
 		mutate(&tx)
-		if _, err := v.Verify(c.sign(t, tx)); !errors.Is(err, ErrNotSubscribed) {
-			t.Errorf("%s: expected ErrNotSubscribed, got %v", name, err)
+		if _, err := v.Verify(c.sign(t, tx)); !errors.Is(err, domain.ErrNotSubscribed) {
+			t.Errorf("%s: expected domain.ErrNotSubscribed, got %v", name, err)
 		}
 	}
 }
@@ -160,8 +162,7 @@ func TestVerifyRejectsForgeries(t *testing.T) {
 }
 
 func TestEmbeddedAppleRootParses(t *testing.T) {
-	v, err := NewVerifier("com.holymessages.app", []string{"mensal"})
-	if err != nil || v == nil {
+	if _, err := NewVerifier("com.holymessages.app", []string{"mensal"}); err != nil {
 		t.Fatalf("Apple root CA G3: %v", err)
 	}
 }

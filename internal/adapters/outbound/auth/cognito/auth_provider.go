@@ -1,4 +1,5 @@
-package auth
+// Package cognito issues and checks sessions with an Amazon Cognito user pool.
+package cognito
 
 import (
 	"context"
@@ -11,35 +12,32 @@ import (
 	cip "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/golang-jwt/jwt/v5"
-)
 
-// Tokens is the Cognito session handed to the app.
-type Tokens struct {
-	AccessToken  string `json:"accessToken"`
-	RefreshToken string `json:"refreshToken,omitempty"`
-	ExpiresIn    int32  `json:"expiresIn"`
-}
+	"github.com/reangeline/missale-backend/internal/adapters/outbound/auth/jwks"
+	"github.com/reangeline/missale-backend/internal/core/domain"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
+)
 
 // Cognito keeps one pool user per Apple account, named "apple_<sub>" — the
 // Apple sub is the only identifier Apple guarantees on every sign-in (email
 // comes once, and may be a relay). Sessions use the Hirefy trick: set a fresh
 // random password server-side and run ADMIN_USER_PASSWORD_AUTH, so the app
 // never sees a password and Cognito still issues and rotates the tokens.
-type Cognito struct {
+type authProvider struct {
 	client   *cip.Client
 	poolID   string
 	clientID string
-	jwks     *JWKS
+	jwks     *jwks.JWKS
 	issuer   string
 }
 
-func NewCognito(cfg aws.Config, region, poolID, clientID string) *Cognito {
+func NewAuthProvider(cfg aws.Config, region, poolID, clientID string) outbound.AuthProvider {
 	issuer := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", region, poolID)
-	return &Cognito{
+	return &authProvider{
 		client:   cip.NewFromConfig(cfg),
 		poolID:   poolID,
 		clientID: clientID,
-		jwks:     NewJWKS(issuer + "/.well-known/jwks.json"),
+		jwks:     jwks.New(issuer + "/.well-known/jwks.json"),
 		issuer:   issuer,
 	}
 }
@@ -48,7 +46,7 @@ func UsernameFor(appleSub string) string { return "apple_" + appleSub }
 
 // SignIn creates the pool user on first sign-in and returns a new session.
 // Returns the user's stable ID (Cognito sub).
-func (c *Cognito) SignIn(ctx context.Context, apple AppleIdentity) (string, Tokens, error) {
+func (c *authProvider) SignIn(ctx context.Context, apple domain.AppleIdentity) (string, domain.Session, error) {
 	username := UsernameFor(apple.Sub)
 	userID, err := c.userID(ctx, username)
 	var notFound *types.UserNotFoundException
@@ -60,18 +58,18 @@ func (c *Cognito) SignIn(ctx context.Context, apple AppleIdentity) (string, Toke
 		}
 	}
 	if err != nil {
-		return "", Tokens{}, fmt.Errorf("cognito user: %w", err)
+		return "", domain.Session{}, fmt.Errorf("cognito user: %w", err)
 	}
 
 	password, err := randomPassword()
 	if err != nil {
-		return "", Tokens{}, err
+		return "", domain.Session{}, err
 	}
 	if _, err := c.client.AdminSetUserPassword(ctx, &cip.AdminSetUserPasswordInput{
 		UserPoolId: aws.String(c.poolID), Username: aws.String(username),
 		Password: aws.String(password), Permanent: true,
 	}); err != nil {
-		return "", Tokens{}, fmt.Errorf("set password: %w", err)
+		return "", domain.Session{}, fmt.Errorf("set password: %w", err)
 	}
 	out, err := c.client.AdminInitiateAuth(ctx, &cip.AdminInitiateAuthInput{
 		UserPoolId: aws.String(c.poolID), ClientId: aws.String(c.clientID),
@@ -79,27 +77,27 @@ func (c *Cognito) SignIn(ctx context.Context, apple AppleIdentity) (string, Toke
 		AuthParameters: map[string]string{"USERNAME": username, "PASSWORD": password},
 	})
 	if err != nil {
-		return "", Tokens{}, fmt.Errorf("authenticate: %w", err)
+		return "", domain.Session{}, fmt.Errorf("authenticate: %w", err)
 	}
-	return userID, tokens(out.AuthenticationResult), nil
+	return userID, session(out.AuthenticationResult), nil
 }
 
 // Refresh exchanges a refresh token for a new access token.
-func (c *Cognito) Refresh(ctx context.Context, refreshToken string) (Tokens, error) {
+func (c *authProvider) Refresh(ctx context.Context, refreshToken string) (domain.Session, error) {
 	out, err := c.client.AdminInitiateAuth(ctx, &cip.AdminInitiateAuthInput{
 		UserPoolId: aws.String(c.poolID), ClientId: aws.String(c.clientID),
 		AuthFlow:       types.AuthFlowTypeRefreshTokenAuth,
 		AuthParameters: map[string]string{"REFRESH_TOKEN": refreshToken},
 	})
 	if err != nil {
-		return Tokens{}, fmt.Errorf("refresh: %w", err)
+		return domain.Session{}, fmt.Errorf("refresh: %w", err)
 	}
-	return tokens(out.AuthenticationResult), nil
+	return session(out.AuthenticationResult), nil
 }
 
 // Delete removes the pool user; its tokens stop verifying at their expiry
 // and refresh fails immediately.
-func (c *Cognito) Delete(ctx context.Context, username string) error {
+func (c *authProvider) Delete(ctx context.Context, username string) error {
 	_, err := c.client.AdminDeleteUser(ctx, &cip.AdminDeleteUserInput{
 		UserPoolId: aws.String(c.poolID), Username: aws.String(username),
 	})
@@ -110,35 +108,29 @@ func (c *Cognito) Delete(ctx context.Context, username string) error {
 	return err
 }
 
-// Principal is who an access token belongs to.
-type Principal struct {
-	UserID   string
-	Username string
-}
-
 // Verify checks a Cognito access token issued to our app client.
-func (c *Cognito) Verify(ctx context.Context, accessToken string) (Principal, error) {
+func (c *authProvider) Verify(ctx context.Context, accessToken string) (domain.Principal, error) {
 	token, err := jwt.Parse(accessToken, c.jwks.Keyfunc(ctx),
 		jwt.WithValidMethods([]string{"RS256"}),
 		jwt.WithIssuer(c.issuer),
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return Principal{}, err
+		return domain.Principal{}, err
 	}
 	claims, _ := token.Claims.(jwt.MapClaims)
 	if claims["token_use"] != "access" || claims["client_id"] != c.clientID {
-		return Principal{}, errors.New("not an access token for this app")
+		return domain.Principal{}, errors.New("not an access token for this app")
 	}
 	sub, _ := claims["sub"].(string)
 	username, _ := claims["username"].(string)
 	if sub == "" || username == "" {
-		return Principal{}, errors.New("access token without sub/username")
+		return domain.Principal{}, errors.New("access token without sub/username")
 	}
-	return Principal{UserID: sub, Username: username}, nil
+	return domain.Principal{UserID: sub, Username: username}, nil
 }
 
-func (c *Cognito) userID(ctx context.Context, username string) (string, error) {
+func (c *authProvider) userID(ctx context.Context, username string) (string, error) {
 	out, err := c.client.AdminGetUser(ctx, &cip.AdminGetUserInput{
 		UserPoolId: aws.String(c.poolID), Username: aws.String(username),
 	})
@@ -148,7 +140,7 @@ func (c *Cognito) userID(ctx context.Context, username string) (string, error) {
 	return attribute(out.UserAttributes, "sub")
 }
 
-func (c *Cognito) create(ctx context.Context, username, email string) (string, error) {
+func (c *authProvider) create(ctx context.Context, username, email string) (string, error) {
 	var attrs []types.AttributeType
 	if email != "" {
 		attrs = append(attrs,
@@ -174,11 +166,11 @@ func attribute(attrs []types.AttributeType, name string) (string, error) {
 	return "", fmt.Errorf("attribute %s missing", name)
 }
 
-func tokens(r *types.AuthenticationResultType) Tokens {
+func session(r *types.AuthenticationResultType) domain.Session {
 	if r == nil {
-		return Tokens{}
+		return domain.Session{}
 	}
-	return Tokens{
+	return domain.Session{
 		AccessToken:  aws.ToString(r.AccessToken),
 		RefreshToken: aws.ToString(r.RefreshToken),
 		ExpiresIn:    r.ExpiresIn,
