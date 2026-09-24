@@ -15,13 +15,6 @@ resource "aws_cognito_user_pool" "main" {
   admin_create_user_config {
     allow_admin_create_user_only = true
   }
-
-  schema {
-    name                = "email"
-    attribute_data_type = "String"
-    required            = false
-    mutable             = true
-  }
 }
 
 resource "aws_cognito_user_pool_client" "app" {
