@@ -129,6 +129,15 @@ func (h *AdminHandler) Publish(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, release)
 }
 
+func (h *AdminHandler) Counts(w http.ResponseWriter, r *http.Request) {
+	counts, err := h.content.Counts(r.Context())
+	if err != nil {
+		h.fail(w, "counts", err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"counts": counts})
+}
+
 func (h *AdminHandler) Releases(w http.ResponseWriter, r *http.Request) {
 	list, err := h.content.Releases(r.Context())
 	if err != nil {

@@ -64,6 +64,35 @@ func (m *memRepo) SaveRelease(_ context.Context, r domain.Release) error {
 	return nil
 }
 func (m *memRepo) Releases(context.Context, int) ([]domain.Release, error) { return m.releases, nil }
+func (m *memRepo) Counts(context.Context) (map[string]map[string]int, error) {
+	out := map[string]map[string]int{}
+	for _, it := range m.items {
+		if out[it.Collection] == nil {
+			out[it.Collection] = map[string]int{}
+		}
+		out[it.Collection][it.Lang]++
+	}
+	return out, nil
+}
+
+func TestCountsCoverEveryCollectionAndLanguage(t *testing.T) {
+	s := NewContentService(newMemRepo(), &memPublisher{})
+	ctx := context.Background()
+	for _, id := range []string{"a", "b"} {
+		if _, err := s.Save(ctx, admin, "word_of_day", "pt", id, word(id), -1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	counts, err := s.Counts(ctx)
+	if err != nil || counts["word_of_day"]["pt"] != 2 || counts["word_of_day"]["es"] != 0 {
+		t.Fatalf("counts %v: %v", counts, err)
+	}
+	for _, c := range domain.Collections {
+		if len(counts[c.Key]) != len(domain.ContentLanguages) {
+			t.Fatalf("%s missing languages: %v", c.Key, counts[c.Key])
+		}
+	}
+}
 
 type memPublisher struct {
 	order []string

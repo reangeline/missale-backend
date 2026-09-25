@@ -19,4 +19,7 @@ type ContentService interface {
 	// app will download.
 	Publish(ctx context.Context, by domain.Admin) (domain.Release, error)
 	Releases(ctx context.Context) ([]domain.Release, error)
+	// Counts is collection → language → number of items, for the overview
+	// page (one request instead of one per collection and language).
+	Counts(ctx context.Context) (map[string]map[string]int, error)
 }

@@ -70,8 +70,32 @@ export class ApiError extends Error {
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * fetch that tries again on a network failure or a 503/429: the API runs on
+ * Lambda, and a burst beyond the account's concurrency limit is refused with
+ * a 503 that carries no CORS headers — the browser reports it as a network
+ * error. A short pause and a retry usually gets through.
+ */
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  for (let i = 0; ; i++) {
+    try {
+      const res = await fetch(url, init);
+      if ((res.status === 503 || res.status === 429) && i < attempts - 1) {
+        await sleep(400 * (i + 1));
+        continue;
+      }
+      return res;
+    } catch (e) {
+      if (i >= attempts - 1) throw e;
+      await sleep(400 * (i + 1));
+    }
+  }
+}
+
 async function call<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithRetry(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -128,6 +152,7 @@ export const api = {
     authed<void>(`/v1/admin/content/${collection}/${lang}/${encodeURIComponent(id)}`, { method: "DELETE" }),
   publish: () => authed<Release>("/v1/admin/publish", { method: "POST" }),
   releases: () => authed<{ releases: Release[] }>("/v1/admin/releases"),
+  counts: () => authed<{ counts: Record<string, Record<string, number>> }>("/v1/admin/counts"),
 };
 
 /** Portuguese message for an API error, for toasts and forms. */

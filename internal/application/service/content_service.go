@@ -132,6 +132,22 @@ func (s *contentService) Publish(ctx context.Context, by domain.Admin) (domain.R
 	return release, nil
 }
 
+func (s *contentService) Counts(ctx context.Context) (map[string]map[string]int, error) {
+	counts, err := s.repo.Counts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Every collection and language present, zero when empty.
+	out := map[string]map[string]int{}
+	for _, c := range domain.Collections {
+		out[c.Key] = map[string]int{}
+		for _, l := range domain.ContentLanguages {
+			out[c.Key][l] = counts[c.Key][l]
+		}
+	}
+	return out, nil
+}
+
 func (s *contentService) Releases(ctx context.Context) ([]domain.Release, error) {
 	return s.repo.Releases(ctx, 20)
 }

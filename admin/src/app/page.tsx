@@ -25,18 +25,10 @@ export default function Home() {
     if (!email) return;
     (async () => {
       try {
-        const { collections } = await api.collections();
-        setCollections(collections);
-        const next: Record<string, Record<string, number>> = {};
-        await Promise.all(
-          collections.flatMap((c) =>
-            LANGUAGES.map(async (l) => {
-              const { items } = await api.list(c.key, l.key);
-              (next[c.key] ??= {})[l.key] = items.length;
-            }),
-          ),
-        );
-        setCounts(next);
+        // Three requests, one after another: the API's Lambda has a small
+        // concurrency limit, and a burst of parallel calls gets refused.
+        setCollections((await api.collections()).collections);
+        setCounts((await api.counts()).counts);
         setReleases((await api.releases()).releases);
       } catch (e) {
         toast.error(describe(e));

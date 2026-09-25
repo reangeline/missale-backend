@@ -84,6 +84,27 @@ func (r *contentRepository) Delete(ctx context.Context, collection, lang, id str
 	return deleted > 0, err
 }
 
+func (r *contentRepository) Counts(ctx context.Context) (map[string]map[string]int, error) {
+	rows, err := r.pool.Query(ctx, `SELECT collection, lang, count(*) FROM content_items GROUP BY collection, lang`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]int{}
+	for rows.Next() {
+		var c, l string
+		var n int
+		if err := rows.Scan(&c, &l, &n); err != nil {
+			return nil, err
+		}
+		if out[c] == nil {
+			out[c] = map[string]int{}
+		}
+		out[c][l] = n
+	}
+	return out, rows.Err()
+}
+
 func (r *contentRepository) LatestRelease(ctx context.Context) (domain.Release, bool, error) {
 	var rel domain.Release
 	err := r.pool.QueryRow(ctx, `SELECT version, published_at, published_by, items FROM content_releases
