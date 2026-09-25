@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,12 @@ type Collection struct {
 
 // Collections is the registry of what the admin page edits. A collection
 // added here also needs the app to read it (see holy_messages RemoteContent).
+// MoodStates are the check-in's states, as the app names them.
+var MoodStates = []string{
+	"peace", "grateful", "joyful", "hopeful", "forgiven", "loved", "steadfast",
+	"empty", "anxious", "guilty", "grief", "lonely", "angry", "dryness", "doubtful", "tired",
+}
+
 var Collections = []Collection{
 	{
 		Key:         "word_of_day",
@@ -80,6 +87,28 @@ var Collections = []Collection{
 			}},
 		},
 	},
+}
+
+func init() {
+	Collections = append(Collections, Collection{
+		Key:         "mood_reliefs",
+		Label:       "Respostas do check-in",
+		Description: "O salmo, o santo e o passo concreto mostrados depois do \"Hoje eu estou…\" e escolhidos pela orientação. A ordem dentro de cada estado é a que o app usa.",
+		Fields: []Field{
+			{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: grief-03. Não mude depois de publicado."},
+			{Key: "stateID", Label: "Estado", Type: FieldText, Required: true, Pattern: "^(" + strings.Join(MoodStates, "|") + ")$",
+				Help: "Um de: peace (em paz), grateful (grato), joyful (alegre), hopeful (esperançoso), forgiven (perdoado), loved (amado), steadfast (firme), empty (vazio), anxious (ansioso), guilty (culpado), grief (enlutado), lonely (sozinho), angry (com raiva), dryness (árido na oração), doubtful (em dúvida), tired (cansado)."},
+			{Key: "title", Label: "Título", Type: FieldText, Required: true},
+			{Key: "psalmRef", Label: "Referência do salmo", Type: FieldText, Required: true, Help: "Ex.: Salmo 42, 4"},
+			{Key: "psalmText", Label: "Texto do salmo", Type: FieldLongText, Required: true},
+			{Key: "psalmWhy", Label: "Por que este salmo", Type: FieldLongText, Required: true},
+			{Key: "saintID", Label: "Santo (identificador)", Type: FieldText, Help: "O identificador do santo na coleção Santos (ex.: monica), para abrir a ficha dele. Vazio: sem link."},
+			{Key: "saintName", Label: "Nome do santo", Type: FieldText, Required: true},
+			{Key: "saintWhy", Label: "Por que este santo", Type: FieldLongText, Required: true},
+			{Key: "stepTitle", Label: "Título do passo", Type: FieldText, Required: true, Help: "Ex.: Um passo concreto"},
+			{Key: "stepBody", Label: "O passo concreto", Type: FieldLongText, Required: true},
+		},
+	})
 }
 
 func CollectionByKey(key string) (Collection, bool) {
