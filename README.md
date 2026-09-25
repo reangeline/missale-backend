@@ -35,11 +35,30 @@ internal/adapters/outbound/decision/jev   Jev via OpenRouter
 - O banco guarda só `users` (id, apple_sub), `decision_usage` (chamadas por dia, limite `DAILY_DECISION_LIMIT`) e `free_decisions` (chamadas grátis usadas).
 - A assinatura é verificada pela cadeia de certificados da Apple (Apple Root CA G3), sem chamar a Apple.
 
-## Deploy
+## Fluxo (gitflow, como no Hirefy)
+
+```
+feature/fix → PR para develop → CI (vet, testes, build) + terraform plan do dev → merge
+            → deploy automático no dev (deploy-dev.yml: apply, migrações, /health)
+            → validar no dev (o TestFlight usa o dev) → PR develop → main → CI + plan do prod → merge
+            → Actions › Deploy Prod › Run workflow (em main): é a aprovação de produção
+```
+
+- O GitHub entra na AWS pelo papel `missale-github-deploy` (OIDC, sem chave fixa),
+  criado por `terraform/bootstrap` e restrito a este repositório.
+- Segredo do repositório: `OPENROUTER_API_KEY`. Variável: `AWS_DEPLOY_ROLE_ARN`.
+- Repositório privado no plano grátis: o GitHub não permite proteger `main`/`develop`
+  nem exigir aprovação de ambiente. Por isso o deploy de prod é manual, e o PR é
+  convenção, não regra. Com GitHub Pro (ou repositório público) dá para ligar as duas.
+
+## Deploy à mão (se preciso)
 
 ```
 ./scripts/bootstrap-state.sh          # só uma vez: bucket do estado do Terraform
 cp terraform/environments/dev/secrets.tfvars.example terraform/environments/dev/secrets.tfvars  # e preencher
 make deploy ENV=dev                   # testes + build + terraform apply
-make migrate ENV=dev                  # tabelas e papel missale_api no DSQL
+make migrate ENV=dev                  # tabelas e papel missale_api no DSQL (pode repetir)
 ```
+
+Planos do Terraform (`*.tfplan`) guardam as variáveis, inclusive a chave do
+OpenRouter: ficam fora do git.
