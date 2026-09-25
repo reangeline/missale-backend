@@ -49,6 +49,8 @@ module "content_cdn" {
   app_name    = local.app_name
   environment = local.env
   account_id  = data.aws_caller_identity.current.account_id
+
+  upload_origins = [for o in split(",", var.admin_origins) : trimspace(o) if trimspace(o) != ""]
 }
 
 module "lambda" {
@@ -70,6 +72,7 @@ module "lambda" {
     COGNITO_ADMIN_CLIENT_ID = module.cognito.admin_client_id
     CONTENT_BUCKET          = module.content_cdn.bucket
     ADMIN_ORIGINS           = var.admin_origins
+    CONTENT_BASE_URL        = module.content_cdn.base_url
   }
 }
 

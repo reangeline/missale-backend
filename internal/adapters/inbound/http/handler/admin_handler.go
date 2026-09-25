@@ -138,6 +138,22 @@ func (h *AdminHandler) Counts(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]any{"counts": counts})
 }
 
+func (h *AdminHandler) PrepareImageUpload(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ContentType string `json:"contentType"`
+	}
+	if !decodeJSON(w, r, &body) {
+		RespondError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	upload, err := h.content.PrepareImageUpload(r.Context(), middleware.AdminFrom(r), body.ContentType)
+	if err != nil {
+		h.fail(w, "image upload", err)
+		return
+	}
+	respondJSON(w, http.StatusOK, upload)
+}
+
 func (h *AdminHandler) Releases(w http.ResponseWriter, r *http.Request) {
 	list, err := h.content.Releases(r.Context())
 	if err != nil {

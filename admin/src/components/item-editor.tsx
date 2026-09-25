@@ -116,6 +116,55 @@ function EditorForm({ collection, lang, item, onClose, onSaved }: Props & { item
   );
 }
 
+const ACCEPTED_IMAGES = ["image/jpeg", "image/png", "image/webp"];
+
+/** An uploaded image: preview, send a new one, or remove it. */
+function ImageInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    if (!ACCEPTED_IMAGES.includes(file.type)) {
+      toast.error("Use JPEG, PNG ou WebP.");
+      return;
+    }
+    setBusy(true);
+    try {
+      onChange(await api.uploadImage(file));
+      toast.success("Imagem enviada. Salve o rascunho e publique para chegar ao app.");
+    } catch (e) {
+      toast.error(describe(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted text-xs text-muted-foreground">
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a remote, already-optimized image; next/image needs the host configured
+          <img src={value} alt="" className="size-full object-cover" />
+        ) : (
+          "sem imagem"
+        )}
+      </div>
+      <div className="grid gap-2">
+        <label className="inline-flex">
+          <input type="file" accept={ACCEPTED_IMAGES.join(",")} className="sr-only" disabled={busy}
+            onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+          <span className="cursor-pointer rounded-lg border px-2.5 py-1.5 text-sm hover:bg-muted">
+            {busy ? "Enviando…" : value ? "Trocar imagem" : "Enviar imagem"}
+          </span>
+        </label>
+        {value && (
+          <Button type="button" variant="ghost" size="sm" className="justify-self-start" onClick={() => onChange("")}>
+            Remover
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function emptyValue(f: Field): Value {
   return f.type === "paragraphs" || f.type === "items" ? [] : "";
 }
@@ -124,6 +173,9 @@ function emptyValue(f: Field): Value {
 function FieldInput({ field, value, disabled, onChange }: {
   field: Field; value: Value; disabled?: boolean; onChange: (v: Value) => void;
 }) {
+  if (field.type === "image") {
+    return <ImageInput value={typeof value === "string" ? value : ""} onChange={onChange} />;
+  }
   if (field.type === "paragraphs") {
     const list = Array.isArray(value) ? (value as string[]) : [];
     return (

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/reangeline/missale-backend/internal/core/domain"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
 )
 
 // ContentService is what the admin page does with the app's content.
@@ -22,4 +23,7 @@ type ContentService interface {
 	// Counts is collection → language → number of items, for the overview
 	// page (one request instead of one per collection and language).
 	Counts(ctx context.Context) (map[string]map[string]int, error)
+	// PrepareImageUpload authorizes one image upload (the browser sends the
+	// file straight to storage) and says where the image will be served.
+	PrepareImageUpload(ctx context.Context, by domain.Admin, contentType string) (outbound.ImageUpload, error)
 }

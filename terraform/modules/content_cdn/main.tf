@@ -14,6 +14,19 @@ resource "aws_s3_bucket_public_access_block" "content" {
   restrict_public_buckets = true
 }
 
+# The admin page uploads images straight to the bucket with a presigned POST
+# (the API only signs the policy), so the browser needs CORS for POST from
+# the admin page's origins — and nothing else.
+resource "aws_s3_bucket_cors_configuration" "content" {
+  bucket = aws_s3_bucket.content.id
+  cors_rule {
+    allowed_methods = ["POST"]
+    allowed_origins = var.upload_origins
+    allowed_headers = ["*"]
+    max_age_seconds = 600
+  }
+}
+
 resource "aws_s3_bucket_versioning" "content" {
   bucket = aws_s3_bucket.content.id
   versioning_configuration { status = "Enabled" }

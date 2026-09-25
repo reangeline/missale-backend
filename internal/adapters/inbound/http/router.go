@@ -62,6 +62,7 @@ func NewRouter(auth inbound.AuthService, account inbound.AccountService, decisio
 				r.Post("/publish", h.Publish)
 				r.Get("/releases", h.Releases)
 				r.Get("/counts", h.Counts)
+				r.Post("/images", h.PrepareImageUpload)
 			})
 		})
 	}
