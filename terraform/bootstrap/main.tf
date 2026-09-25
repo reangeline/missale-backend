@@ -30,7 +30,7 @@ locals {
   account = data.aws_caller_identity.current.account_id
   # GitHub's immutable subject (owner and repo IDs): survives renames, and a
   # new repo reusing the name can't assume the role.
-  repo = "reangeline@23719026/missale-backend@1386524838"
+  repo = "reangeline@23719026/missale-backend@1386542649"
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
