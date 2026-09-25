@@ -186,7 +186,7 @@ func saint(mutate func(map[string]any)) json.RawMessage {
 	d := map[string]any{
 		"id": "agostinho", "dateKey": "08-28", "name": "Santo Agostinho", "role": "Bispo",
 		"rank": "Memória", "calendarNote": "Calendário Romano Geral · 28 de agosto",
-		"bioParagraphs": []any{"Nasceu em Tagaste.", "Morreu em Hipona."},
+		"bioParagraphs":     []any{"Nasceu em Tagaste.", "Morreu em Hipona."},
 		"whyItMattersToday": "Fala a quem procura.", "prayer": "Santo Agostinho, rogai por nós.",
 	}
 	if mutate != nil {
@@ -244,5 +244,23 @@ func TestSaintsAlwaysCarryEveryField(t *testing.T) {
 	}), -1)
 	if err != nil || !strings.Contains(string(withStory.Data), "Confissões VIII") {
 		t.Fatalf("story not kept: %s %v", withStory.Data, err)
+	}
+}
+
+func TestMoodReliefsOnlyAcceptKnownStates(t *testing.T) {
+	s := NewContentService(newMemRepo(), &memPublisher{})
+	reply := func(state string) json.RawMessage {
+		b, _ := json.Marshal(map[string]string{"id": "grief-01", "stateID": state, "title": "As lágrimas, meu pão",
+			"psalmRef": "Salmo 42, 4", "psalmText": "…", "psalmWhy": "…", "saintName": "Santa Mônica",
+			"saintWhy": "…", "stepTitle": "Um passo concreto", "stepBody": "…"})
+		return b
+	}
+	if _, err := s.Save(context.Background(), admin, "mood_reliefs", "pt", "grief-01", reply("grief"), -1); err != nil {
+		t.Fatalf("known state refused: %v", err)
+	}
+	for _, bad := range []string{"sad", "Grief", "grief ", "peace|grief"} {
+		if _, err := s.Save(context.Background(), admin, "mood_reliefs", "pt", "grief-01", reply(bad), -1); !errors.Is(err, domain.ErrInvalidContent) && bad != "grief " {
+			t.Errorf("state %q accepted: %v", bad, err)
+		}
 	}
 }
