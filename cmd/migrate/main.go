@@ -1,6 +1,6 @@
 // Command migrate applies migrations/*.sql to an Aurora DSQL cluster as admin.
 //
-//	go run ./cmd/migrate -host <endpoint> -lambda-role <arn>
+//	go run ./cmd/migrate -host <endpoint> -lambda-role <arn> [-from 002]
 //
 // DSQL runs one DDL per transaction, so each statement is sent on its own.
 // Rerunning is safe: "already exists" (42710) is reported and skipped.
@@ -27,6 +27,7 @@ func main() {
 	host := flag.String("host", "", "DSQL endpoint")
 	role := flag.String("lambda-role", "", "IAM role ARN of the API Lambda")
 	region := flag.String("region", "us-east-1", "AWS region")
+	from := flag.String("from", "", "apply only files named >= this prefix, e.g. 002")
 	flag.Parse()
 	if *host == "" || *role == "" {
 		log.Fatal("-host and -lambda-role are required")
@@ -49,6 +50,9 @@ func main() {
 	files, _ := filepath.Glob("migrations/*.sql")
 	sort.Strings(files)
 	for _, f := range files {
+		if *from != "" && filepath.Base(f) < *from {
+			continue
+		}
 		raw, err := os.ReadFile(f)
 		if err != nil {
 			log.Fatal(err)

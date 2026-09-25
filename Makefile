@@ -21,4 +21,4 @@ deploy: test build
 
 # Creates tables and the missale_api role mapped to the Lambda's IAM role.
 migrate:
-	go run ./cmd/migrate -host $$($(TF) output -raw dsql_endpoint) -lambda-role $$($(TF) output -raw lambda_role_arn)
+	go run ./cmd/migrate -host $$($(TF) output -raw dsql_endpoint) -lambda-role $$($(TF) output -raw lambda_role_arn) $(if $(FROM),-from $(FROM))
