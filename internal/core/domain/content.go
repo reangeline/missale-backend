@@ -144,6 +144,34 @@ func init() {
 	)
 }
 
+func init() {
+	Collections = append(Collections,
+		Collection{
+			Key:         "prayer_categories",
+			Label:       "Categorias de orações",
+			Description: "Os temas da aba Orações, na ordem em que aparecem. Publique junto com as orações; categoria sem oração não aparece.",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: peace-surrender. As orações apontam para ele."},
+				{Key: "title", Label: "Título", Type: FieldText, Required: true},
+			},
+		},
+		Collection{
+			Key:         "prayers",
+			Label:       "Orações",
+			Description: "As orações devocionais, cada uma na sua categoria. A ordem dentro da categoria é a do app.",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: st-francis-peace."},
+				{Key: "categoryID", Label: "Categoria", Type: FieldText, Required: true, Help: "O identificador da categoria (ex.: peace-surrender)."},
+				{Key: "title", Label: "Título", Type: FieldText, Required: true},
+				{Key: "attribution", Label: "Autoria", Type: FieldText, Help: "Ex.: São Francisco de Assis. Vazio se for tradicional."},
+				{Key: "focus", Label: "Do que trata", Type: FieldText, Required: true, Help: "Uma linha que aparece sob o título."},
+				{Key: "saintID", Label: "Santo (identificador)", Type: FieldText, Help: "O santo da coleção Santos que esta oração abre (ex.: francisco-assis)."},
+				{Key: "fullText", Label: "Texto da oração", Type: FieldLongText, Required: true, Help: "Cada linha nova aparece como linha nova no app."},
+			},
+		},
+	)
+}
+
 func CollectionByKey(key string) (Collection, bool) {
 	for _, c := range Collections {
 		if c.Key == key {
