@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/reangeline/missale-backend/internal/core/domain"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
 )
 
 type memRepo struct {
@@ -290,6 +291,42 @@ func TestMoodReliefsOnlyAcceptKnownStates(t *testing.T) {
 	for _, bad := range []string{"sad", "Grief", "grief ", "peace|grief"} {
 		if _, err := s.Save(context.Background(), admin, "mood_reliefs", "pt", "grief-01", reply(bad), -1); !errors.Is(err, domain.ErrInvalidContent) && bad != "grief " {
 			t.Errorf("state %q accepted: %v", bad, err)
+		}
+	}
+}
+
+type fakeUploader struct{ keys []string }
+
+func (f *fakeUploader) PrepareUpload(_ context.Context, key, contentType string, max int64) (outbound.ImageUpload, error) {
+	f.keys = append(f.keys, key)
+	return outbound.ImageUpload{URL: "https://bucket.s3.amazonaws.com/", Fields: map[string]string{"key": key, "Content-Type": contentType}, MaxBytes: max}, nil
+}
+
+func TestImageUploadsAndImageFields(t *testing.T) {
+	up := &fakeUploader{}
+	s := WithImages(NewContentService(newMemRepo(), &memPublisher{}), up, "https://cdn.example.net/")
+	ctx := context.Background()
+
+	if _, err := s.PrepareImageUpload(ctx, admin, "image/gif"); !errors.Is(err, domain.ErrInvalidContent) {
+		t.Fatalf("gif accepted: %v", err)
+	}
+	a, err := s.PrepareImageUpload(ctx, admin, "image/jpeg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := s.PrepareImageUpload(ctx, admin, "image/png")
+	if !strings.HasPrefix(a.PublicURL, "https://cdn.example.net/images/") || !strings.HasSuffix(a.PublicURL, ".jpg") ||
+		a.PublicURL == b.PublicURL || a.MaxBytes != domain.MaxImageBytes {
+		t.Fatalf("uploads: %+v / %+v", a, b)
+	}
+
+	withArt := func(url string) json.RawMessage { return saint(func(d map[string]any) { d["artworkURL"] = url }) }
+	if _, err := s.Save(ctx, admin, "saints", "pt", "agostinho", withArt(a.PublicURL), -1); err != nil {
+		t.Fatalf("uploaded image refused: %v", err)
+	}
+	for _, foreign := range []string{"https://evil.example/x.jpg", "https://cdn.example.net/v3/saints/pt.json", "javascript:alert(1)"} {
+		if _, err := s.Save(ctx, admin, "saints", "pt", "agostinho", withArt(foreign), -1); !errors.Is(err, domain.ErrInvalidContent) {
+			t.Errorf("foreign image URL %q accepted: %v", foreign, err)
 		}
 	}
 }

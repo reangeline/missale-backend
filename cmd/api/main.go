@@ -58,8 +58,9 @@ func main() {
 		adminRoutes = &httpAdapter.AdminRoutes{
 			Auth: appservice.NewAdminAuthService(
 				cognito.NewAdminAuthProvider(awsCfg, cfg.AWSRegion, cfg.CognitoUserPoolID, cfg.CognitoAdminClientID)),
-			Content: appservice.NewContentService(
-				dsql.NewContentRepository(pool), s3storage.NewPublisher(awsCfg, cfg.ContentBucket)),
+			Content: appservice.WithImages(
+				appservice.NewContentService(dsql.NewContentRepository(pool), s3storage.NewPublisher(awsCfg, cfg.ContentBucket)),
+				s3storage.NewImageUploader(awsCfg, cfg.ContentBucket), cfg.ContentBaseURL),
 			Origins: cfg.AdminOrigins,
 		}
 	}

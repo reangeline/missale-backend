@@ -19,7 +19,15 @@ const (
 	FieldLongText   FieldType = "longtext"   // a block of text
 	FieldParagraphs FieldType = "paragraphs" // a list of paragraphs ([]string)
 	FieldItems      FieldType = "items"      // a list of small records, each with Subfields
+	FieldImage      FieldType = "image"      // the URL of an image uploaded through the admin page
 )
+
+// ImageTypes are the image formats the admin page accepts, by MIME type,
+// with the file extension each is stored under.
+var ImageTypes = map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+// MaxImageBytes caps one uploaded image.
+const MaxImageBytes = 5 << 20
 
 type Field struct {
 	Key      string    `json:"key"`
@@ -79,7 +87,8 @@ var Collections = []Collection{
 			{Key: "bioParagraphs", Label: "Biografia", Type: FieldParagraphs, Required: true},
 			{Key: "whyItMattersToday", Label: "Por que importa hoje", Type: FieldLongText, Required: true},
 			{Key: "prayer", Label: "Oração", Type: FieldLongText, Required: true},
-			{Key: "artworkName", Label: "Arte (nome da imagem no app)", Type: FieldText, Help: "Só imagens que já vêm no app. Deixe vazio se não houver arte."},
+			{Key: "artworkName", Label: "Arte embutida (nome da imagem no app)", Type: FieldText, Help: "Só imagens que já vêm no app. Se houver arte enviada abaixo, ela vale mais."},
+			{Key: "artworkURL", Label: "Arte enviada", Type: FieldImage, Help: "JPEG, PNG ou WebP até 5 MB, de preferência quadrada e em domínio público. Vale mais que a arte embutida."},
 			{Key: "stories", Label: "Histórias e milagres", Type: FieldItems, Help: "Cada uma com a sua fonte.", Subfields: []Field{
 				{Key: "title", Label: "Título", Type: FieldText, Required: true},
 				{Key: "body", Label: "Texto", Type: FieldLongText, Required: true},

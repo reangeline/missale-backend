@@ -8,7 +8,7 @@ export const CONTENT_URL = process.env.NEXT_PUBLIC_CONTENT_URL ?? "";
 export type Field = {
   key: string;
   label: string;
-  type: "text" | "longtext" | "paragraphs" | "items";
+  type: "text" | "longtext" | "paragraphs" | "items" | "image";
   required: boolean;
   help?: string;
   pattern?: string;
@@ -153,6 +153,19 @@ export const api = {
   publish: () => authed<Release>("/v1/admin/publish", { method: "POST" }),
   releases: () => authed<{ releases: Release[] }>("/v1/admin/releases"),
   counts: () => authed<{ counts: Record<string, Record<string, number>> }>("/v1/admin/counts"),
+  /** Sends one image straight to storage; returns the URL the app will use. */
+  uploadImage: async (file: File): Promise<string> => {
+    const up = await authed<{ url: string; fields: Record<string, string>; publicUrl: string; maxBytes: number }>(
+      "/v1/admin/images", { method: "POST", body: JSON.stringify({ contentType: file.type }) },
+    );
+    if (file.size > up.maxBytes) throw new ApiError(400, "invalid_content", `imagem maior que ${Math.round(up.maxBytes / 1048576)} MB`);
+    const form = new FormData();
+    for (const [k, v] of Object.entries(up.fields)) form.append(k, v);
+    form.append("file", file); // the file must be the last field
+    const res = await fetch(up.url, { method: "POST", body: form });
+    if (!res.ok) throw new ApiError(res.status, "upload_failed", "o armazenamento recusou a imagem");
+    return up.publicUrl;
+  },
 };
 
 /** Portuguese message for an API error, for toasts and forms. */
@@ -170,6 +183,8 @@ export function describe(e: unknown): string {
       return `Conteúdo inválido: ${e.detail ?? ""}`;
     case "not_found":
       return "Item não encontrado.";
+    case "upload_failed":
+      return `Não foi possível enviar a imagem: ${e.detail ?? ""}`;
     default:
       return `Erro do servidor (${e.code}).`;
   }

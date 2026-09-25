@@ -32,6 +32,8 @@ type Config struct {
 	// CONTENT_BUCKET the /v1/admin routes are not mounted.
 	CognitoAdminClientID string
 	ContentBucket        string
+	// ContentBaseURL is where the bucket is served (CloudFront), for image URLs.
+	ContentBaseURL string
 	// AdminOrigins are the browser origins of the admin page (comma-separated).
 	AdminOrigins []string
 }
@@ -60,6 +62,7 @@ func Load() (Config, error) {
 	c.FreeDecisions = free
 	c.CognitoAdminClientID = os.Getenv("COGNITO_ADMIN_CLIENT_ID")
 	c.ContentBucket = os.Getenv("CONTENT_BUCKET")
+	c.ContentBaseURL = os.Getenv("CONTENT_BASE_URL")
 	for _, o := range strings.Split(os.Getenv("ADMIN_ORIGINS"), ",") {
 		if o = strings.TrimSpace(o); o != "" {
 			c.AdminOrigins = append(c.AdminOrigins, o)

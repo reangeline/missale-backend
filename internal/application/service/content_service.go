@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -20,11 +21,44 @@ import (
 type contentService struct {
 	repo      outbound.ContentRepository
 	publisher outbound.ContentPublisher
-	now       func() time.Time
+	images    outbound.ImageUploader
+	// imageBaseURL is where uploaded images are served ("https://…/images/");
+	// an image field only accepts URLs under it.
+	imageBaseURL string
+	now          func() time.Time
 }
 
 func NewContentService(repo outbound.ContentRepository, publisher outbound.ContentPublisher) inbound.ContentService {
 	return &contentService{repo: repo, publisher: publisher, now: time.Now}
+}
+
+// WithImages enables image fields and uploads, served under contentBaseURL.
+func WithImages(s inbound.ContentService, images outbound.ImageUploader, contentBaseURL string) inbound.ContentService {
+	cs := s.(*contentService)
+	cs.images = images
+	cs.imageBaseURL = strings.TrimSuffix(contentBaseURL, "/") + "/images/"
+	return cs
+}
+
+func (s *contentService) PrepareImageUpload(ctx context.Context, by domain.Admin, contentType string) (outbound.ImageUpload, error) {
+	ext, ok := domain.ImageTypes[contentType]
+	if !ok {
+		return outbound.ImageUpload{}, fmt.Errorf("%w: image must be JPEG, PNG or WebP", domain.ErrInvalidContent)
+	}
+	if s.images == nil {
+		return outbound.ImageUpload{}, fmt.Errorf("image uploads are not configured")
+	}
+	var b [12]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return outbound.ImageUpload{}, err
+	}
+	key := "images/" + hex.EncodeToString(b[:]) + "." + ext
+	upload, err := s.images.PrepareUpload(ctx, key, contentType, domain.MaxImageBytes)
+	if err != nil {
+		return outbound.ImageUpload{}, err
+	}
+	upload.PublicURL = s.imageBaseURL + strings.TrimPrefix(key, "images/")
+	return upload, nil
 }
 
 func (s *contentService) Collections() []domain.Collection { return domain.Collections }
@@ -45,7 +79,7 @@ func (s *contentService) Save(ctx context.Context, by domain.Admin, collection, 
 	if err != nil {
 		return domain.ContentItem{}, err
 	}
-	normalized, err := validateItem(c, id, data)
+	normalized, err := validateItem(c, id, data, s.imageBaseURL)
 	if err != nil {
 		return domain.ContentItem{}, err
 	}
@@ -167,7 +201,7 @@ func resolve(collection, lang string) (domain.Collection, error) {
 // the required ones filled and "id" matching the path. The result always
 // carries every declared field ("" or [] when empty), so the app can decode
 // it into a struct with non-optional properties.
-func validateItem(c domain.Collection, id string, data json.RawMessage) (json.RawMessage, error) {
+func validateItem(c domain.Collection, id string, data json.RawMessage, imageBaseURL string) (json.RawMessage, error) {
 	if !itemIDPattern.MatchString(id) {
 		return nil, fmt.Errorf("%w: id must be lowercase letters, digits and hyphens", domain.ErrInvalidContent)
 	}
@@ -175,7 +209,7 @@ func validateItem(c domain.Collection, id string, data json.RawMessage) (json.Ra
 	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&fields); err != nil || fields == nil {
 		return nil, fmt.Errorf("%w: data must be a JSON object", domain.ErrInvalidContent)
 	}
-	clean, err := cleanFields(c.Fields, fields, "")
+	clean, err := cleanFields(c.Fields, fields, "", imageBaseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +219,7 @@ func validateItem(c domain.Collection, id string, data json.RawMessage) (json.Ra
 	return json.Marshal(clean)
 }
 
-func cleanFields(defs []domain.Field, fields map[string]any, prefix string) (map[string]any, error) {
+func cleanFields(defs []domain.Field, fields map[string]any, prefix, imageBaseURL string) (map[string]any, error) {
 	known := map[string]domain.Field{}
 	for _, f := range defs {
 		known[f.Key] = f
@@ -216,6 +250,24 @@ func cleanFields(defs []domain.Field, fields map[string]any, prefix string) (map
 				return nil, err
 			}
 			clean[f.Key] = text
+		case domain.FieldImage:
+			url := ""
+			if present && value != nil {
+				s, ok := value.(string)
+				if !ok {
+					return nil, fmt.Errorf("%w: %q must be an image URL", domain.ErrInvalidContent, name)
+				}
+				url = strings.TrimSpace(s)
+			}
+			// Only images uploaded through the admin page: the app downloads
+			// from the content host and nothing else.
+			if url != "" && (imageBaseURL == "" || !strings.HasPrefix(url, imageBaseURL)) {
+				return nil, fmt.Errorf("%w: %q must be an image uploaded in the admin page", domain.ErrInvalidContent, name)
+			}
+			if f.Required && url == "" {
+				return nil, fmt.Errorf("%w: %q is required", domain.ErrInvalidContent, name)
+			}
+			clean[f.Key] = url
 		case domain.FieldParagraphs:
 			list, err := asList(value, present, name)
 			if err != nil {
@@ -250,7 +302,7 @@ func cleanFields(defs []domain.Field, fields map[string]any, prefix string) (map
 				if !ok {
 					return nil, fmt.Errorf("%w: %s[%d] must be an object", domain.ErrInvalidContent, name, i)
 				}
-				rec, err := cleanFields(f.Subfields, obj, fmt.Sprintf("%s[%d].", name, i))
+				rec, err := cleanFields(f.Subfields, obj, fmt.Sprintf("%s[%d].", name, i), imageBaseURL)
 				if err != nil {
 					return nil, err
 				}
