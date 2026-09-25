@@ -172,6 +172,24 @@ func init() {
 	)
 }
 
+func init() {
+	Collections = append(Collections, Collection{
+		Key:         "apparitions",
+		Label:       "Aparições marianas",
+		Description: "As aparições da aba Orações, na ordem em que aparecem. A arte vem do identificador (só as que já têm imagem no app).",
+		Fields: []Field{
+			{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: lourdes-1858. Com imagem no app: fatima-1917, guadalupe-1531, aparecida-1717, lourdes-1858, rue-du-bac-1830."},
+			{Key: "name", Label: "Nome", Type: FieldText, Required: true},
+			{Key: "place", Label: "Lugar", Type: FieldText, Required: true},
+			{Key: "year", Label: "Ano", Type: FieldText, Required: true},
+			{Key: "visionaries", Label: "Videntes", Type: FieldText, Required: true},
+			{Key: "summary", Label: "Resumo", Type: FieldLongText, Required: true},
+			{Key: "ecclesialRecognition", Label: "Reconhecimento da Igreja", Type: FieldLongText, Required: true},
+			{Key: "source", Label: "Fonte", Type: FieldText, Required: true},
+		},
+	})
+}
+
 func CollectionByKey(key string) (Collection, bool) {
 	for _, c := range Collections {
 		if c.Key == key {
