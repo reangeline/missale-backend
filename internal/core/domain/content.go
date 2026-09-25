@@ -14,8 +14,10 @@ var ContentLanguages = []string{"pt", "en", "es"}
 type FieldType string
 
 const (
-	FieldText     FieldType = "text"     // one line
-	FieldLongText FieldType = "longtext" // paragraphs
+	FieldText       FieldType = "text"       // one line
+	FieldLongText   FieldType = "longtext"   // a block of text
+	FieldParagraphs FieldType = "paragraphs" // a list of paragraphs ([]string)
+	FieldItems      FieldType = "items"      // a list of small records, each with Subfields
 )
 
 type Field struct {
@@ -24,6 +26,10 @@ type Field struct {
 	Type     FieldType `json:"type"`
 	Required bool      `json:"required"`
 	Help     string    `json:"help,omitempty"`
+	// Pattern, when set, is a regular expression a text field must match.
+	Pattern string `json:"pattern,omitempty"`
+	// Subfields of each record in an "items" field (text or longtext only).
+	Subfields []Field `json:"subfields,omitempty"`
 }
 
 // Collection is one kind of content the app reads (the word of the day, the
@@ -49,6 +55,29 @@ var Collections = []Collection{
 			{Key: "reference", Label: "Referência", Type: FieldText, Required: true, Help: "Ex.: Mateus 5, 3"},
 			{Key: "translationNote", Label: "Edição da tradução", Type: FieldText, Required: true, Help: "Ex.: Figueiredo 1896 · domínio público, grafia atualizada"},
 			{Key: "context", Label: "Contexto", Type: FieldLongText, Required: true},
+		},
+	},
+	{
+		Key:         "saints",
+		Label:       "Santos",
+		Description: "O santo do dia, o arquivo de santos e o calendário. Um santo por data; cada idioma tem a sua lista.",
+		Fields: []Field{
+			{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, igual nos três idiomas (ex.: agostinho). Não mude depois de publicado."},
+			{Key: "dateKey", Label: "Data da memória", Type: FieldText, Required: true, Pattern: `^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`, Help: "Mês-dia, ex.: 08-28 para 28 de agosto."},
+			{Key: "name", Label: "Nome", Type: FieldText, Required: true},
+			{Key: "lifespan", Label: "Período de vida", Type: FieldText, Help: "Ex.: 354–430 ou c. 480–547"},
+			{Key: "role", Label: "Quem foi", Type: FieldText, Required: true, Help: "Ex.: Bispo de Hipona, teólogo e Doutor da Igreja"},
+			{Key: "rank", Label: "Grau litúrgico", Type: FieldText, Required: true, Help: "Solenidade, Festa, Memória ou Memória facultativa (o app traduz esses quatro)."},
+			{Key: "calendarNote", Label: "Nota do calendário", Type: FieldText, Required: true, Help: "Ex.: Calendário Romano Geral · 28 de agosto"},
+			{Key: "bioParagraphs", Label: "Biografia", Type: FieldParagraphs, Required: true},
+			{Key: "whyItMattersToday", Label: "Por que importa hoje", Type: FieldLongText, Required: true},
+			{Key: "prayer", Label: "Oração", Type: FieldLongText, Required: true},
+			{Key: "artworkName", Label: "Arte (nome da imagem no app)", Type: FieldText, Help: "Só imagens que já vêm no app. Deixe vazio se não houver arte."},
+			{Key: "stories", Label: "Histórias e milagres", Type: FieldItems, Help: "Cada uma com a sua fonte.", Subfields: []Field{
+				{Key: "title", Label: "Título", Type: FieldText, Required: true},
+				{Key: "body", Label: "Texto", Type: FieldLongText, Required: true},
+				{Key: "source", Label: "Fonte", Type: FieldText, Required: true},
+			}},
 		},
 	},
 }

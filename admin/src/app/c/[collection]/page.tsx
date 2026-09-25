@@ -50,11 +50,14 @@ export default function CollectionPage() {
   }, [email, key, lang, revision]);
 
   // The columns: the id, then the first two other fields (e.g. reference, text).
-  const shown = useMemo(() => collection?.fields.filter((f) => f.key !== "id").slice(0, 2) ?? [], [collection]);
+  const shown = useMemo(
+    () => collection?.fields.filter((f) => f.key !== "id" && (f.type === "text" || f.type === "longtext")).slice(0, 2) ?? [],
+    [collection],
+  );
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!items || !q) return items ?? [];
-    return items.filter((it) => Object.values(it.data).some((v) => v.toLowerCase().includes(q)));
+    return items.filter((it) => JSON.stringify(it.data).toLowerCase().includes(q));
   }, [items, query]);
 
   if (!email) return null;
@@ -106,7 +109,9 @@ export default function CollectionPage() {
                     <TableCell className="text-muted-foreground">{it.position + 1}</TableCell>
                     <TableCell className="font-mono text-xs">{it.id}</TableCell>
                     {shown.map((f) => (
-                      <TableCell key={f.key} className="max-w-md truncate">{it.data[f.key]}</TableCell>
+                      <TableCell key={f.key} className="max-w-md truncate">
+                        {typeof it.data[f.key] === "string" ? (it.data[f.key] as string) : ""}
+                      </TableCell>
                     ))}
                     <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                       {new Date(it.updatedAt).toLocaleDateString("pt-BR")}
