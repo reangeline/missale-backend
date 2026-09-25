@@ -4,3 +4,4 @@ build/
 .terraform/
 *.tfstate*
 .DS_Store
+*.tfplan

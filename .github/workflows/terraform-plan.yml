@@ -1,0 +1,35 @@
+name: Terraform Plan
+
+# Shows on the PR what the merge will change: PRs to develop plan dev,
+# PRs to main plan prod.
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    env:
+      ENV: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+      TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: make build
+      - run: terraform -chdir=terraform/environments/$ENV init -input=false
+      - run: terraform -chdir=terraform/environments/$ENV plan -input=false -no-color
