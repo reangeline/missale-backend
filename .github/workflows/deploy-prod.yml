@@ -1,8 +1,10 @@
 name: Deploy Prod
 
-# Manual on purpose: on a private repo without GitHub Pro there is no
-# environment approval, so pressing "Run workflow" on main is the approval.
+# Every merge into main waits for approval in the "production" environment
+# (Actions › the run › Review deployments), as in Hirefy. Also runnable by hand.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +17,7 @@ jobs:
   deploy:
     name: Deploy prod
     if: github.ref == 'refs/heads/main'
+    environment: production
     runs-on: ubuntu-latest
     env:
       TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}

@@ -41,15 +41,15 @@ internal/adapters/outbound/decision/jev   Jev via OpenRouter
 feature/fix → PR para develop → CI (vet, testes, build) + terraform plan do dev → merge
             → deploy automático no dev (deploy-dev.yml: apply, migrações, /health)
             → validar no dev (o TestFlight usa o dev) → PR develop → main → CI + plan do prod → merge
-            → Actions › Deploy Prod › Run workflow (em main): é a aprovação de produção
+            → deploy-prod.yml espera a aprovação no ambiente "production" (Actions › Review deployments)
 ```
 
 - O GitHub entra na AWS pelo papel `missale-github-deploy` (OIDC, sem chave fixa),
   criado por `terraform/bootstrap` e restrito a este repositório.
 - Segredo do repositório: `OPENROUTER_API_KEY`. Variável: `AWS_DEPLOY_ROLE_ARN`.
-- Repositório privado no plano grátis: o GitHub não permite proteger `main`/`develop`
-  nem exigir aprovação de ambiente. Por isso o deploy de prod é manual, e o PR é
-  convenção, não regra. Com GitHub Pro (ou repositório público) dá para ligar as duas.
+- `main` e `develop` são protegidas: só entram por PR, com o check `Test` verde.
+- O repositório é público; nenhum segredo fica no código. Planos do Terraform
+  (`*.tfplan`) guardam as variáveis e ficam fora do git.
 
 ## Deploy à mão (se preciso)
 
