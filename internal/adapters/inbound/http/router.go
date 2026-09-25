@@ -61,6 +61,7 @@ func NewRouter(auth inbound.AuthService, account inbound.AccountService, decisio
 				r.Delete("/content/{collection}/{lang}/{id}", h.Delete)
 				r.Post("/publish", h.Publish)
 				r.Get("/releases", h.Releases)
+				r.Get("/counts", h.Counts)
 			})
 		})
 	}

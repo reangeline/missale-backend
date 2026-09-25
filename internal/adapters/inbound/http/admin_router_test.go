@@ -59,6 +59,9 @@ func (nopContent) Publish(_ context.Context, by domain.Admin) (domain.Release, e
 	return domain.Release{Version: 1, PublishedBy: by.Email}, nil
 }
 func (nopContent) Releases(context.Context) ([]domain.Release, error) { return nil, nil }
+func (nopContent) Counts(context.Context) (map[string]map[string]int, error) {
+	return map[string]map[string]int{}, nil
+}
 
 func adminRouter() http.Handler {
 	return NewRouter(

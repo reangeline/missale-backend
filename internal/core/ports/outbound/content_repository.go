@@ -14,6 +14,8 @@ type ContentRepository interface {
 	NextPosition(ctx context.Context, collection, lang string) (int, error)
 	Upsert(ctx context.Context, item domain.ContentItem) error
 	Delete(ctx context.Context, collection, lang, id string) (bool, error)
+	// Counts returns how many items each collection has per language.
+	Counts(ctx context.Context) (map[string]map[string]int, error)
 
 	LatestRelease(ctx context.Context) (domain.Release, bool, error)
 	SaveRelease(ctx context.Context, r domain.Release) error
