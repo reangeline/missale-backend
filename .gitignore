@@ -5,3 +5,5 @@ build/
 *.tfstate*
 .DS_Store
 *.tfplan
+.vercel
+.env*

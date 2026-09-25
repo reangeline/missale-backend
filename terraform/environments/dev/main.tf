@@ -83,7 +83,7 @@ module "api_gateway" {
 # Browser origins of the admin page (comma-separated), for CORS.
 variable "admin_origins" {
   type    = string
-  default = "http://localhost:3000"
+  default = "https://missale-admin.vercel.app,http://localhost:3000"
 }
 
 variable "openrouter_api_key" {
