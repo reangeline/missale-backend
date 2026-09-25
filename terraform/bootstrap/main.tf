@@ -99,10 +99,16 @@ resource "aws_iam_role_policy" "deploy" {
         Resource = ["arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/missale-*", "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/missale-*:*"]
       },
       {
+        Sid      = "ContentBucket"
+        Effect   = "Allow"
+        Action   = ["s3:*"]
+        Resource = ["arn:aws:s3:::missale-content-*", "arn:aws:s3:::missale-content-*/*"]
+      },
+      {
         # These services don't let Terraform's calls be scoped by name.
         Sid      = "ApiCognitoDsql"
         Effect   = "Allow"
-        Action   = ["apigateway:*", "cognito-idp:*", "dsql:*", "logs:DescribeLogGroups"]
+        Action   = ["apigateway:*", "cognito-idp:*", "dsql:*", "logs:DescribeLogGroups", "cloudfront:*", "sts:GetCallerIdentity"]
         Resource = "*"
       },
     ]

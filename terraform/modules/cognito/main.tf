@@ -17,6 +17,36 @@ resource "aws_cognito_user_pool" "main" {
   }
 }
 
+# The admin page: email + password, its own client so an app session can't
+# open it. Admins are users named by their email, in the "admin" group,
+# created by hand (scripts/create-admin.sh) — Cognito emails the temporary
+# password, changed at the first sign-in.
+resource "aws_cognito_user_pool_client" "admin" {
+  name         = "${var.app_name}-admin-${var.environment}"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret               = false
+  prevent_user_existence_errors = "ENABLED"
+  enable_token_revocation       = true
+  explicit_auth_flows           = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+
+  access_token_validity  = 1
+  id_token_validity      = 1
+  refresh_token_validity = 7
+
+  token_validity_units {
+    access_token  = "hours"
+    id_token      = "hours"
+    refresh_token = "days"
+  }
+}
+
+resource "aws_cognito_user_group" "admin" {
+  name         = "admin"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Can edit and publish the app's content"
+}
+
 resource "aws_cognito_user_pool_client" "app" {
   name         = "${var.app_name}-ios-${var.environment}"
   user_pool_id = aws_cognito_user_pool.main.id

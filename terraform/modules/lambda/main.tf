@@ -35,6 +35,12 @@ resource "aws_iam_role_policy" "access" {
         Resource = var.cognito_pool_arn
       },
       {
+        # Publishing the content (admin page).
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${var.content_bucket_arn}/*"
+      },
+      {
         # Custom DB role only (missale_api), never the admin role.
         Effect   = "Allow"
         Action   = ["dsql:DbConnect"]
