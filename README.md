@@ -35,6 +35,26 @@ internal/adapters/outbound/decision/jev   Jev via OpenRouter
 - O banco guarda só `users` (id, apple_sub), `decision_usage` (chamadas por dia, limite `DAILY_DECISION_LIMIT`) e `free_decisions` (chamadas grátis usadas).
 - A assinatura é verificada pela cadeia de certificados da Apple (Apple Root CA G3), sem chamar a Apple.
 
+## Painel de conteúdo (`/v1/admin`)
+
+Login com e-mail e senha (cliente `admin` do Cognito, grupo `admin`). Criar um admin:
+`./scripts/create-admin.sh dev email@exemplo.com` — o Cognito manda a senha provisória por e-mail.
+
+| Rota | O que faz |
+|---|---|
+| `POST /v1/admin/auth/signin` `{email,password}` | sessão, ou `newPasswordNeeded` + `session` no primeiro acesso |
+| `POST /v1/admin/auth/new-password` `{email,session,newPassword}` | troca a senha provisória |
+| `POST /v1/admin/auth/refresh` `{refreshToken}` | renova a sessão |
+| `GET /v1/admin/collections` | coleções e campos (a página monta os formulários daqui) |
+| `GET /v1/admin/content/{coleção}/{idioma}` | itens em ordem |
+| `PUT /v1/admin/content/{coleção}/{idioma}/{id}` `{data, position?}` | cria ou edita (rascunho) |
+| `DELETE /v1/admin/content/{coleção}/{idioma}/{id}` | apaga |
+| `POST /v1/admin/publish` | gera `v{N}/{coleção}/{idioma}.json` e o `manifest.json` no S3/CloudFront |
+| `GET /v1/admin/releases` | publicações |
+
+O app baixa `manifest.json` do CloudFront, compara o hash de cada arquivo e baixa só o que mudou.
+Idioma sem itens no painel não é publicado: o app continua com a lista embutida.
+
 ## Fluxo (gitflow, como no Hirefy)
 
 ```

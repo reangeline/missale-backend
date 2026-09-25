@@ -16,6 +16,7 @@ import (
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/auth/cognito"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/decision/jev"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/persistence/dsql"
+	s3storage "github.com/reangeline/missale-backend/internal/adapters/outbound/storage/s3"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/subscription/storekit"
 	appservice "github.com/reangeline/missale-backend/internal/application/service"
 	appconfig "github.com/reangeline/missale-backend/pkg/config"
@@ -52,8 +53,19 @@ func main() {
 	accountService := appservice.NewAccountService(authProvider, userRepo)
 	decisionService := appservice.NewDecisionService(subscriptionVerifier, usageRepo, decisionEngine, cfg.DailyDecisionLimit, cfg.FreeDecisions)
 
+	var adminRoutes *httpAdapter.AdminRoutes
+	if cfg.CognitoAdminClientID != "" && cfg.ContentBucket != "" {
+		adminRoutes = &httpAdapter.AdminRoutes{
+			Auth: appservice.NewAdminAuthService(
+				cognito.NewAdminAuthProvider(awsCfg, cfg.AWSRegion, cfg.CognitoUserPoolID, cfg.CognitoAdminClientID)),
+			Content: appservice.NewContentService(
+				dsql.NewContentRepository(pool), s3storage.NewPublisher(awsCfg, cfg.ContentBucket)),
+			Origins: cfg.AdminOrigins,
+		}
+	}
+
 	// Inbound adapter
-	router := httpAdapter.NewRouter(authService, accountService, decisionService,
+	router := httpAdapter.NewRouter(authService, accountService, decisionService, adminRoutes,
 		slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {

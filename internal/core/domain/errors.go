@@ -11,4 +11,11 @@ var (
 	ErrInvalidState      = errors.New("invalid_state")
 	ErrInvalidQuestions  = errors.New("invalid_questions")
 	ErrDecisionEngine    = errors.New("jev_unavailable")
+
+	ErrForbidden          = errors.New("forbidden")
+	ErrInvalidCredentials = errors.New("invalid_credentials")
+	ErrUnknownCollection  = errors.New("unknown_collection")
+	ErrUnknownLanguage    = errors.New("unknown_language")
+	ErrInvalidContent     = errors.New("invalid_content")
+	ErrNotFound           = errors.New("not_found")
 )

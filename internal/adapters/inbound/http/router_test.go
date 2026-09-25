@@ -105,6 +105,7 @@ func newFixture() fixture {
 		service.NewAuthService(fakeIdentity{}, f.auth, f.users),
 		service.NewAccountService(f.auth, f.users),
 		service.NewDecisionService(fakeSubs{}, f.usage, f.jev, 5, 2),
+		nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	return f
