@@ -181,3 +181,68 @@ func TestDeleteUnknownItemIsNotFound(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func saint(mutate func(map[string]any)) json.RawMessage {
+	d := map[string]any{
+		"id": "agostinho", "dateKey": "08-28", "name": "Santo Agostinho", "role": "Bispo",
+		"rank": "Memória", "calendarNote": "Calendário Romano Geral · 28 de agosto",
+		"bioParagraphs": []any{"Nasceu em Tagaste.", "Morreu em Hipona."},
+		"whyItMattersToday": "Fala a quem procura.", "prayer": "Santo Agostinho, rogai por nós.",
+	}
+	if mutate != nil {
+		mutate(d)
+	}
+	b, _ := json.Marshal(d)
+	return b
+}
+
+func TestSaintsValidation(t *testing.T) {
+	s := NewContentService(newMemRepo(), &memPublisher{})
+	ctx := context.Background()
+	bad := map[string]func(map[string]any){
+		"date not MM-dd":        func(d map[string]any) { d["dateKey"] = "28/08" },
+		"impossible month":      func(d map[string]any) { d["dateKey"] = "13-01" },
+		"no biography":          func(d map[string]any) { d["bioParagraphs"] = []any{} },
+		"only empty paragraphs": func(d map[string]any) { d["bioParagraphs"] = []any{"  ", ""} },
+		"paragraphs not a list": func(d map[string]any) { d["bioParagraphs"] = "texto" },
+		"story without source": func(d map[string]any) {
+			d["stories"] = []any{map[string]any{"title": "O lobo", "body": "..."}}
+		},
+		"story with extra field": func(d map[string]any) {
+			d["stories"] = []any{map[string]any{"title": "t", "body": "b", "source": "s", "x": "y"}}
+		},
+	}
+	for name, mutate := range bad {
+		if _, err := s.Save(ctx, admin, "saints", "pt", "agostinho", saint(mutate), -1); !errors.Is(err, domain.ErrInvalidContent) {
+			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}
+
+func TestSaintsAlwaysCarryEveryField(t *testing.T) {
+	s := NewContentService(newMemRepo(), &memPublisher{})
+	item, err := s.Save(context.Background(), admin, "saints", "pt", "agostinho",
+		saint(func(d map[string]any) { d["bioParagraphs"] = []any{"Nasceu em Tagaste.", "   "} }), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	_ = json.Unmarshal(item.Data, &got)
+	// Optional fields left out still come back, empty, for the app's decoder.
+	if got["lifespan"] != "" || got["artworkName"] != "" {
+		t.Fatalf("optional text fields: %v / %v", got["lifespan"], got["artworkName"])
+	}
+	if stories, ok := got["stories"].([]any); !ok || len(stories) != 0 {
+		t.Fatalf("stories should be an empty list, got %#v", got["stories"])
+	}
+	if bio := got["bioParagraphs"].([]any); len(bio) != 1 {
+		t.Fatalf("empty paragraph should be dropped: %v", bio)
+	}
+
+	withStory, err := s.Save(context.Background(), admin, "saints", "pt", "agostinho", saint(func(d map[string]any) {
+		d["stories"] = []any{map[string]any{"title": "Tolle, lege", "body": "No jardim de Milão…", "source": "Confissões VIII"}}
+	}), -1)
+	if err != nil || !strings.Contains(string(withStory.Data), "Confissões VIII") {
+		t.Fatalf("story not kept: %s %v", withStory.Data, err)
+	}
+}

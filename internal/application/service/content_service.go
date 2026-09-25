@@ -147,49 +147,132 @@ func resolve(collection, lang string) (domain.Collection, error) {
 	return c, nil
 }
 
-// validateItem accepts exactly the collection's fields, as strings, with the
-// required ones filled and "id" matching the path. Returns the object
-// re-encoded, so what is stored is always well-formed.
+// validateItem accepts exactly the collection's fields with the right shapes,
+// the required ones filled and "id" matching the path. The result always
+// carries every declared field ("" or [] when empty), so the app can decode
+// it into a struct with non-optional properties.
 func validateItem(c domain.Collection, id string, data json.RawMessage) (json.RawMessage, error) {
 	if !itemIDPattern.MatchString(id) {
 		return nil, fmt.Errorf("%w: id must be lowercase letters, digits and hyphens", domain.ErrInvalidContent)
 	}
 	var fields map[string]any
-	dec := json.NewDecoder(bytes.NewReader(data))
-	if err := dec.Decode(&fields); err != nil || fields == nil {
+	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&fields); err != nil || fields == nil {
 		return nil, fmt.Errorf("%w: data must be a JSON object", domain.ErrInvalidContent)
 	}
-	known := map[string]domain.Field{}
-	for _, f := range c.Fields {
-		known[f.Key] = f
+	clean, err := cleanFields(c.Fields, fields, "")
+	if err != nil {
+		return nil, err
 	}
-	clean := map[string]string{}
-	for key, value := range fields {
-		f, ok := known[key]
-		if !ok {
-			return nil, fmt.Errorf("%w: unknown field %q", domain.ErrInvalidContent, key)
-		}
-		text, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("%w: %q must be text", domain.ErrInvalidContent, key)
-		}
-		if f.Type == domain.FieldText {
-			text = strings.TrimSpace(text)
-		}
-		if utf8.RuneCountInString(text) > maxFieldChars {
-			return nil, fmt.Errorf("%w: %q is too long", domain.ErrInvalidContent, key)
-		}
-		clean[key] = text
-	}
-	for _, f := range c.Fields {
-		if f.Required && strings.TrimSpace(clean[f.Key]) == "" {
-			return nil, fmt.Errorf("%w: %q is required", domain.ErrInvalidContent, f.Key)
-		}
-	}
-	if got, ok := clean["id"]; ok && got != id {
+	if got, ok := clean["id"].(string); ok && got != id {
 		return nil, fmt.Errorf("%w: data.id %q differs from %q", domain.ErrInvalidContent, got, id)
 	}
 	return json.Marshal(clean)
+}
+
+func cleanFields(defs []domain.Field, fields map[string]any, prefix string) (map[string]any, error) {
+	known := map[string]domain.Field{}
+	for _, f := range defs {
+		known[f.Key] = f
+	}
+	for key := range fields {
+		if _, ok := known[key]; !ok {
+			return nil, fmt.Errorf("%w: unknown field %q", domain.ErrInvalidContent, prefix+key)
+		}
+	}
+	clean := map[string]any{}
+	for _, f := range defs {
+		name := prefix + f.Key
+		value, present := fields[f.Key]
+		switch f.Type {
+		case domain.FieldText, domain.FieldLongText:
+			text := ""
+			if present && value != nil {
+				s, ok := value.(string)
+				if !ok {
+					return nil, fmt.Errorf("%w: %q must be text", domain.ErrInvalidContent, name)
+				}
+				text = s
+			}
+			if f.Type == domain.FieldText {
+				text = strings.TrimSpace(text)
+			}
+			if err := checkText(f, name, text); err != nil {
+				return nil, err
+			}
+			clean[f.Key] = text
+		case domain.FieldParagraphs:
+			list, err := asList(value, present, name)
+			if err != nil {
+				return nil, err
+			}
+			paragraphs := []string{}
+			for i, item := range list {
+				s, ok := item.(string)
+				if !ok {
+					return nil, fmt.Errorf("%w: %s[%d] must be text", domain.ErrInvalidContent, name, i)
+				}
+				if s = strings.TrimSpace(s); s == "" {
+					continue // an emptied paragraph box
+				}
+				if err := checkText(domain.Field{Key: f.Key}, name, s); err != nil {
+					return nil, err
+				}
+				paragraphs = append(paragraphs, s)
+			}
+			if f.Required && len(paragraphs) == 0 {
+				return nil, fmt.Errorf("%w: %q needs at least one paragraph", domain.ErrInvalidContent, name)
+			}
+			clean[f.Key] = paragraphs
+		case domain.FieldItems:
+			list, err := asList(value, present, name)
+			if err != nil {
+				return nil, err
+			}
+			records := []map[string]any{}
+			for i, item := range list {
+				obj, ok := item.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("%w: %s[%d] must be an object", domain.ErrInvalidContent, name, i)
+				}
+				rec, err := cleanFields(f.Subfields, obj, fmt.Sprintf("%s[%d].", name, i))
+				if err != nil {
+					return nil, err
+				}
+				records = append(records, rec)
+			}
+			if f.Required && len(records) == 0 {
+				return nil, fmt.Errorf("%w: %q needs at least one entry", domain.ErrInvalidContent, name)
+			}
+			clean[f.Key] = records
+		default:
+			return nil, fmt.Errorf("%w: field %q has unknown type", domain.ErrInvalidContent, name)
+		}
+	}
+	return clean, nil
+}
+
+func asList(value any, present bool, name string) ([]any, error) {
+	if !present || value == nil {
+		return nil, nil
+	}
+	list, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q must be a list", domain.ErrInvalidContent, name)
+	}
+	return list, nil
+}
+
+func checkText(f domain.Field, name, text string) error {
+	if f.Required && strings.TrimSpace(text) == "" {
+		return fmt.Errorf("%w: %q is required", domain.ErrInvalidContent, name)
+	}
+	if utf8.RuneCountInString(text) > maxFieldChars {
+		return fmt.Errorf("%w: %q is too long", domain.ErrInvalidContent, name)
+	}
+	if f.Pattern != "" && text != "" && !regexp.MustCompile(f.Pattern).MatchString(text) {
+		return fmt.Errorf("%w: %q has the wrong format", domain.ErrInvalidContent, name)
+	}
+	return nil
 }
 
 // publishedList is the file the app decodes: an array of the items' objects.

@@ -5,14 +5,25 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export const CONTENT_URL = process.env.NEXT_PUBLIC_CONTENT_URL ?? "";
 
-export type Field = { key: string; label: string; type: "text" | "longtext"; required: boolean; help?: string };
+export type Field = {
+  key: string;
+  label: string;
+  type: "text" | "longtext" | "paragraphs" | "items";
+  required: boolean;
+  help?: string;
+  pattern?: string;
+  /** For "items": the fields of each record. */
+  subfields?: Field[];
+};
+/** A field's value: text, a list of paragraphs, or a list of records. */
+export type Value = string | string[] | Record<string, string>[];
 export type Collection = { key: string; label: string; description: string; fields: Field[] };
 export type Item = {
   collection: string;
   lang: string;
   id: string;
   position: number;
-  data: Record<string, string>;
+  data: Record<string, Value>;
   updatedAt: string;
   updatedBy: string;
 };
@@ -108,7 +119,7 @@ export const api = {
   collections: () => authed<{ collections: Collection[] }>("/v1/admin/collections"),
   list: (collection: string, lang: string) =>
     authed<{ items: Item[] }>(`/v1/admin/content/${collection}/${lang}`),
-  save: (collection: string, lang: string, id: string, data: Record<string, string>, position?: number) =>
+  save: (collection: string, lang: string, id: string, data: Record<string, Value>, position?: number) =>
     authed<Item>(`/v1/admin/content/${collection}/${lang}/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify(position === undefined ? { data } : { data, position }),
