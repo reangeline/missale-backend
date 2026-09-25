@@ -24,3 +24,14 @@ func (r *usageRepository) Reserve(ctx context.Context, userID string) (int, erro
 	})
 	return calls, err
 }
+
+func (r *usageRepository) ReserveFree(ctx context.Context, userID string) (int, error) {
+	var calls int
+	err := retry(func() error {
+		return r.pool.QueryRow(ctx, `
+			INSERT INTO free_decisions (user_id, calls) VALUES ($1, 1)
+			ON CONFLICT (user_id) DO UPDATE SET calls = free_decisions.calls + 1
+			RETURNING calls`, userID).Scan(&calls)
+	})
+	return calls, err
+}

@@ -50,7 +50,7 @@ func main() {
 	// Application services
 	authService := appservice.NewAuthService(identityVerifier, authProvider, userRepo)
 	accountService := appservice.NewAccountService(authProvider, userRepo)
-	decisionService := appservice.NewDecisionService(subscriptionVerifier, usageRepo, decisionEngine, cfg.DailyDecisionLimit)
+	decisionService := appservice.NewDecisionService(subscriptionVerifier, usageRepo, decisionEngine, cfg.DailyDecisionLimit, cfg.FreeDecisions)
 
 	// Inbound adapter
 	router := httpAdapter.NewRouter(authService, accountService, decisionService,

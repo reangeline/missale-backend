@@ -59,18 +59,27 @@ func (f *fakeUsers) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-type fakeUsage struct{ calls int }
+type fakeUsage struct{ calls, free int }
 
 func (f *fakeUsage) Reserve(context.Context, string) (int, error) {
 	f.calls++
 	return f.calls, nil
 }
 
+func (f *fakeUsage) ReserveFree(context.Context, string) (int, error) {
+	f.free++
+	return f.free, nil
+}
+
 type fakeSubs struct{}
 
 func (fakeSubs) Verify(jws string) (domain.SubscriptionTransaction, error) {
-	if jws != "subscribed" {
+	switch jws {
+	case "expired":
 		return domain.SubscriptionTransaction{}, domain.ErrNotSubscribed
+	case "subscribed":
+	default:
+		return domain.SubscriptionTransaction{}, errors.New("signature does not verify")
 	}
 	return domain.SubscriptionTransaction{ProductID: "anual"}, nil
 }
@@ -95,7 +104,7 @@ func newFixture() fixture {
 	f.router = NewRouter(
 		service.NewAuthService(fakeIdentity{}, f.auth, f.users),
 		service.NewAccountService(f.auth, f.users),
-		service.NewDecisionService(fakeSubs{}, f.usage, f.jev, 2),
+		service.NewDecisionService(fakeSubs{}, f.usage, f.jev, 5, 2),
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)
 	return f
@@ -145,26 +154,50 @@ func TestRefresh(t *testing.T) {
 	}
 }
 
-func TestDecisionsRequireSessionAndSubscription(t *testing.T) {
+func TestDecisionsRequireASession(t *testing.T) {
 	f := newFixture()
 	if rec, _ := do(t, f.router, "POST", "/v1/decisions", validDecision, nil); rec.Code != 401 {
 		t.Fatalf("no session: %d", rec.Code)
-	}
-	if rec, out := do(t, f.router, "POST", "/v1/decisions", validDecision, map[string]string{"Authorization": "Bearer access"}); rec.Code != 402 || out["error"] != "subscription_required" {
-		t.Fatalf("no subscription: %d %v", rec.Code, out)
 	}
 	rec, out := do(t, f.router, "POST", "/v1/decisions", validDecision, authed)
 	if rec.Code != 200 || out["answers"] == nil {
 		t.Fatalf("decision: %d %v", rec.Code, out)
 	}
-	if len(f.jev.states) != 1 {
-		t.Fatalf("Jev called %d times", len(f.jev.states))
+	if len(f.jev.states) != 1 || f.usage.free != 0 {
+		t.Fatalf("Jev called %d times, free allowance spent %d", len(f.jev.states), f.usage.free)
+	}
+}
+
+// The onboarding's orientação: without a subscription, each account gets two
+// calls (one orientação), then the plans.
+func TestWithoutSubscriptionTheFreeAllowanceRunsOut(t *testing.T) {
+	f := newFixture() // free allowance 2
+	for _, header := range []map[string]string{
+		{"Authorization": "Bearer access"},                              // no subscription at all
+		{"Authorization": "Bearer access", "X-Subscription": "expired"}, // lapsed
+	} {
+		if rec, _ := do(t, f.router, "POST", "/v1/decisions", validDecision, header); rec.Code != 200 {
+			t.Fatalf("free call with %v: %d", header, rec.Code)
+		}
+	}
+	rec, out := do(t, f.router, "POST", "/v1/decisions", validDecision, map[string]string{"Authorization": "Bearer access"})
+	if rec.Code != 402 || out["error"] != "subscription_required" {
+		t.Fatalf("after the allowance: %d %v", rec.Code, out)
+	}
+}
+
+func TestAForgedSubscriptionIsRefusedWithoutSpendingTheAllowance(t *testing.T) {
+	f := newFixture()
+	rec, _ := do(t, f.router, "POST", "/v1/decisions", validDecision,
+		map[string]string{"Authorization": "Bearer access", "X-Subscription": "forged"})
+	if rec.Code != 402 || f.usage.free != 0 || len(f.jev.states) != 0 {
+		t.Fatalf("forged: %d, free spent %d, Jev %d", rec.Code, f.usage.free, len(f.jev.states))
 	}
 }
 
 func TestDecisionsDailyLimit(t *testing.T) {
-	f := newFixture() // limit 2
-	for i := 0; i < 2; i++ {
+	f := newFixture() // limit 5
+	for i := 0; i < 5; i++ {
 		if rec, _ := do(t, f.router, "POST", "/v1/decisions", validDecision, authed); rec.Code != 200 {
 			t.Fatalf("call %d: %d", i, rec.Code)
 		}

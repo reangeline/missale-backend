@@ -18,20 +18,21 @@ type decisionService struct {
 	usage         outbound.UsageRepository
 	engine        outbound.DecisionEngine
 	dailyLimit    int
+	// freeDecisions is each account's lifetime allowance without a
+	// subscription: the orientação the onboarding offers (two calls: state
+	// and risk, then the reviewed reply).
+	freeDecisions int
 }
 
-func NewDecisionService(subscriptions outbound.SubscriptionVerifier, usage outbound.UsageRepository, engine outbound.DecisionEngine, dailyLimit int) inbound.DecisionService {
-	return &decisionService{subscriptions: subscriptions, usage: usage, engine: engine, dailyLimit: dailyLimit}
+func NewDecisionService(subscriptions outbound.SubscriptionVerifier, usage outbound.UsageRepository, engine outbound.DecisionEngine, dailyLimit, freeDecisions int) inbound.DecisionService {
+	return &decisionService{subscriptions: subscriptions, usage: usage, engine: engine, dailyLimit: dailyLimit, freeDecisions: freeDecisions}
 }
 
 func (s *decisionService) Decide(ctx context.Context, p domain.Principal, subscriptionJWS string, req domain.DecisionRequest) (json.RawMessage, error) {
-	if _, err := s.subscriptions.Verify(subscriptionJWS); err != nil {
-		if errors.Is(err, domain.ErrNotSubscribed) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("%w: %v", domain.ErrNotSubscribed, err)
-	}
 	if err := Validate(req); err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, p, subscriptionJWS); err != nil {
 		return nil, err
 	}
 	// Counted before calling Jev, so a failed call still spends one: simpler,
@@ -48,6 +49,29 @@ func (s *decisionService) Decide(ctx context.Context, p domain.Principal, subscr
 		return nil, fmt.Errorf("%w: %v", domain.ErrDecisionEngine, err)
 	}
 	return answers, nil
+}
+
+// authorize lets a subscriber through, and otherwise spends the account's
+// free allowance. Only a valid-but-inactive or missing subscription falls
+// back to the allowance; a forged one is refused outright.
+func (s *decisionService) authorize(ctx context.Context, p domain.Principal, subscriptionJWS string) error {
+	if subscriptionJWS != "" {
+		_, err := s.subscriptions.Verify(subscriptionJWS)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, domain.ErrNotSubscribed) {
+			return fmt.Errorf("%w: %v", domain.ErrNotSubscribed, err)
+		}
+	}
+	used, err := s.usage.ReserveFree(ctx, p.UserID)
+	if err != nil {
+		return fmt.Errorf("reserve free usage: %w", err)
+	}
+	if used > s.freeDecisions {
+		return domain.ErrNotSubscribed
+	}
+	return nil
 }
 
 // Validate enforces the domain limits on a decision request.

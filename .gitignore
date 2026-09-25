@@ -3,3 +3,4 @@ build/
 !*.tfvars.example
 .terraform/
 *.tfstate*
+.DS_Store

@@ -30,6 +30,9 @@ func (r *userRepository) Delete(ctx context.Context, userID string) error {
 			if _, err := tx.Exec(ctx, `DELETE FROM decision_usage WHERE user_id = $1`, userID); err != nil {
 				return err
 			}
+			if _, err := tx.Exec(ctx, `DELETE FROM free_decisions WHERE user_id = $1`, userID); err != nil {
+				return err
+			}
 			_, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
 			return err
 		})

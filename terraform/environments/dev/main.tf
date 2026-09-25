@@ -56,6 +56,7 @@ module "lambda" {
     DSQL_ENDPOINT        = module.dsql.endpoint
     OPENROUTER_API_KEY   = var.openrouter_api_key
     DAILY_DECISION_LIMIT = var.daily_decision_limit
+    FREE_DECISIONS       = var.free_decisions
   }
 }
 
@@ -69,6 +70,13 @@ module "api_gateway" {
 variable "openrouter_api_key" {
   type      = string
   sensitive = true
+}
+
+# Lifetime Jev calls per account without a subscription: the onboarding's
+# orientação uses two.
+variable "free_decisions" {
+  type    = string
+  default = "2"
 }
 
 variable "daily_decision_limit" {

@@ -29,10 +29,10 @@ internal/adapters/outbound/decision/jev   Jev via OpenRouter
 | `POST /v1/auth/apple` `{identityToken}` | todos | valida o token da Apple, cria/acha o usuário no Cognito, devolve a sessão |
 | `POST /v1/auth/refresh` `{refreshToken}` | todos | renova o access token |
 | `DELETE /v1/account` | logado | apaga o usuário no banco e no Cognito |
-| `POST /v1/decisions` `{state, questions}` | logado + assinante | repassa ao Jev; header `X-Subscription` = `jwsRepresentation` da transação StoreKit 2 |
+| `POST /v1/decisions` `{state, questions}` | logado + assinante, ou dentro da cota grátis | repassa ao Jev; header `X-Subscription` = `jwsRepresentation` da transação StoreKit 2. Sem assinatura, cada conta tem `FREE_DECISIONS` (2) chamadas na vida: a orientação do onboarding |
 
 - O texto do usuário (`state`) vai para o Jev e para nenhum outro lugar: não é logado nem gravado.
-- O banco guarda só `users` (id, apple_sub) e `decision_usage` (chamadas por dia, limite `DAILY_DECISION_LIMIT`).
+- O banco guarda só `users` (id, apple_sub), `decision_usage` (chamadas por dia, limite `DAILY_DECISION_LIMIT`) e `free_decisions` (chamadas grátis usadas).
 - A assinatura é verificada pela cadeia de certificados da Apple (Apple Root CA G3), sem chamar a Apple.
 
 ## Deploy

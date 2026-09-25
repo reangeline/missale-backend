@@ -23,6 +23,9 @@ type Config struct {
 	// DailyDecisionLimit caps Jev calls per user per UTC day. One orientação
 	// uses two calls (state + risk, then the reviewed reply).
 	DailyDecisionLimit int
+	// FreeDecisions is each account's lifetime allowance without a
+	// subscription (the onboarding's orientação uses two).
+	FreeDecisions int
 }
 
 func Load() (Config, error) {
@@ -42,6 +45,11 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("DAILY_DECISION_LIMIT: %w", err)
 	}
 	c.DailyDecisionLimit = limit
+	free, err := strconv.Atoi(getenv("FREE_DECISIONS", "2"))
+	if err != nil {
+		return c, fmt.Errorf("FREE_DECISIONS: %w", err)
+	}
+	c.FreeDecisions = free
 	for name, value := range map[string]string{
 		"COGNITO_USER_POOL_ID": c.CognitoUserPoolID,
 		"COGNITO_CLIENT_ID":    c.CognitoClientID,
