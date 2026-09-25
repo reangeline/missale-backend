@@ -190,6 +190,39 @@ func init() {
 	})
 }
 
+func init() {
+	Collections = append(Collections,
+		Collection{
+			Key:         "sunday_readings",
+			Label:       "Leituras de domingo",
+			Description: "As referências das leituras de cada domingo (só as referências: o texto das leituras é licenciado e não vai no app).",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "A chave em minúsculas, ex.: ordinary-12-b."},
+				{Key: "key", Label: "Chave litúrgica", Type: FieldText, Required: true, Pattern: `^(advent|christmas|lent|easter|ordinary)-[0-9]{1,2}-[ABC]$`,
+					Help: "tempo-semana-ciclo, ex.: ordinary-12-B (advent, christmas, lent, easter, ordinary; ciclo A, B ou C)."},
+				{Key: "firstReading", Label: "Primeira leitura", Type: FieldText, Required: true, Help: "Ex.: Isaías 2,1-5"},
+				{Key: "psalm", Label: "Salmo", Type: FieldText, Required: true},
+				{Key: "secondReading", Label: "Segunda leitura", Type: FieldText, Help: "Vazio só quando não há segunda leitura."},
+				{Key: "gospel", Label: "Evangelho", Type: FieldText, Required: true},
+			},
+		},
+		Collection{
+			Key:         "feasts",
+			Label:       "Festas de data fixa",
+			Description: "O santoral do calendário litúrgico: uma celebração por data, com grau e cor.",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "A própria data, ex.: 12-25."},
+				{Key: "monthDay", Label: "Data", Type: FieldText, Required: true, Pattern: `^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`, Help: "Mês-dia, ex.: 12-25."},
+				{Key: "name", Label: "Celebração", Type: FieldText, Required: true},
+				{Key: "rank", Label: "Grau", Type: FieldText, Required: true, Pattern: `^(Solenidade|Festa|Memória|Memória facultativa)$`,
+					Help: "Exatamente: Solenidade, Festa, Memória ou Memória facultativa (o app traduz)."},
+				{Key: "color", Label: "Cor litúrgica", Type: FieldText, Required: true, Pattern: `^(red|purple|green|white|rose|black)$`,
+					Help: "Em código: white (branco), red (vermelho), green (verde), purple (roxo), rose (rosa), black (preto)."},
+			},
+		},
+	)
+}
+
 func CollectionByKey(key string) (Collection, bool) {
 	for _, c := range Collections {
 		if c.Key == key {
