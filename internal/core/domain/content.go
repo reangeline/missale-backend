@@ -111,6 +111,39 @@ func init() {
 	})
 }
 
+func init() {
+	Collections = append(Collections,
+		Collection{
+			Key:         "formation_tracks",
+			Label:       "Trilhas de formação",
+			Description: "As trilhas da aba Formação, na ordem em que aparecem. \"A Missa, parte por parte\" (mass-part-by-part) é a trilha principal. Publique junto com as lições.",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: sacraments. As lições apontam para ele."},
+				{Key: "title", Label: "Título", Type: FieldText, Required: true},
+				{Key: "meta", Label: "Linha de apoio", Type: FieldText, Required: true, Help: "Ex.: 7 partes · 4 min cada"},
+			},
+		},
+		Collection{
+			Key:         "formation_lessons",
+			Label:       "Lições de formação",
+			Description: "As partes de cada trilha. O número da parte sai da ordem das lições da mesma trilha. Uma lição cuja trilha não existe não aparece no app.",
+			Fields: []Field{
+				{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: sacraments-1-pt."},
+				{Key: "trackID", Label: "Trilha", Type: FieldText, Required: true, Help: "O identificador da trilha (ex.: sacraments)."},
+				{Key: "kicker", Label: "Sobretítulo", Type: FieldText, Required: true, Help: "Normalmente o nome da trilha."},
+				{Key: "title", Label: "Título", Type: FieldText, Required: true},
+				{Key: "bodyParagraphs", Label: "Texto", Type: FieldParagraphs, Required: true},
+				{Key: "quoteText", Label: "Citação", Type: FieldLongText},
+				{Key: "quoteAttribution", Label: "Fonte da citação", Type: FieldText},
+				{Key: "glossaryTerms", Label: "Glossário", Type: FieldItems, Subfields: []Field{
+					{Key: "term", Label: "Termo", Type: FieldText, Required: true},
+					{Key: "definition", Label: "Definição", Type: FieldLongText, Required: true},
+				}},
+			},
+		},
+	)
+}
+
 func CollectionByKey(key string) (Collection, bool) {
 	for _, c := range Collections {
 		if c.Key == key {
