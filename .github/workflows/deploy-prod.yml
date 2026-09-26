@@ -1,0 +1,44 @@
+name: Deploy Prod
+
+# Every merge into main waits for approval in the "production" environment
+# (Actions › the run › Review deployments), as in Hirefy. Also runnable by hand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: deploy-prod
+
+jobs:
+  deploy:
+    name: Deploy prod
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: go test ./...
+      - run: make build
+      - run: terraform -chdir=terraform/environments/prod init -input=false
+      - run: terraform -chdir=terraform/environments/prod apply -input=false -auto-approve
+      - run: make migrate ENV=prod
+      - name: Smoke test
+        run: curl -fsS "$(terraform -chdir=terraform/environments/prod output -raw api_endpoint)health"

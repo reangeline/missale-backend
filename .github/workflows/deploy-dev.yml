@@ -1,0 +1,41 @@
+name: Deploy Dev
+
+# Every merge into develop goes to the dev stack (the one TestFlight uses).
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency: deploy-dev
+
+jobs:
+  deploy:
+    name: Deploy dev
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: go test ./...
+      - run: make build
+      - run: terraform -chdir=terraform/environments/dev init -input=false
+      - run: terraform -chdir=terraform/environments/dev apply -input=false -auto-approve
+      # Idempotent: rerunning finished migrations is a no-op.
+      - run: make migrate ENV=dev
+      - name: Smoke test
+        run: curl -fsS "$(terraform -chdir=terraform/environments/dev output -raw api_endpoint)health"

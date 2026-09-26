@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -26,6 +27,15 @@ type Config struct {
 	// FreeDecisions is each account's lifetime allowance without a
 	// subscription (the onboarding's orientação uses two).
 	FreeDecisions int
+
+	// The admin page. Optional: without COGNITO_ADMIN_CLIENT_ID and
+	// CONTENT_BUCKET the /v1/admin routes are not mounted.
+	CognitoAdminClientID string
+	ContentBucket        string
+	// ContentBaseURL is where the bucket is served (CloudFront), for image URLs.
+	ContentBaseURL string
+	// AdminOrigins are the browser origins of the admin page (comma-separated).
+	AdminOrigins []string
 }
 
 func Load() (Config, error) {
@@ -50,6 +60,14 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("FREE_DECISIONS: %w", err)
 	}
 	c.FreeDecisions = free
+	c.CognitoAdminClientID = os.Getenv("COGNITO_ADMIN_CLIENT_ID")
+	c.ContentBucket = os.Getenv("CONTENT_BUCKET")
+	c.ContentBaseURL = os.Getenv("CONTENT_BASE_URL")
+	for _, o := range strings.Split(os.Getenv("ADMIN_ORIGINS"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			c.AdminOrigins = append(c.AdminOrigins, o)
+		}
+	}
 	for name, value := range map[string]string{
 		"COGNITO_USER_POOL_ID": c.CognitoUserPoolID,
 		"COGNITO_CLIENT_ID":    c.CognitoClientID,

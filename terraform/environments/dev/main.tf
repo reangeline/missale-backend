@@ -42,21 +42,37 @@ module "dsql" {
   environment = local.env
 }
 
+data "aws_caller_identity" "current" {}
+
+module "content_cdn" {
+  source      = "../../modules/content_cdn"
+  app_name    = local.app_name
+  environment = local.env
+  account_id  = data.aws_caller_identity.current.account_id
+
+  upload_origins = [for o in split(",", var.admin_origins) : trimspace(o) if trimspace(o) != ""]
+}
+
 module "lambda" {
-  source           = "../../modules/lambda"
-  function_name    = "${local.app_name}-api-${local.env}"
-  source_file      = "../../../build/api.zip"
-  cognito_pool_arn = module.cognito.user_pool_arn
-  dsql_cluster_arn = module.dsql.arn
+  source             = "../../modules/lambda"
+  function_name      = "${local.app_name}-api-${local.env}"
+  source_file        = "../../../build/api.zip"
+  cognito_pool_arn   = module.cognito.user_pool_arn
+  dsql_cluster_arn   = module.dsql.arn
+  content_bucket_arn = module.content_cdn.bucket_arn
 
   environment_variables = {
-    ENVIRONMENT          = local.env
-    COGNITO_USER_POOL_ID = module.cognito.user_pool_id
-    COGNITO_CLIENT_ID    = module.cognito.client_id
-    DSQL_ENDPOINT        = module.dsql.endpoint
-    OPENROUTER_API_KEY   = var.openrouter_api_key
-    DAILY_DECISION_LIMIT = var.daily_decision_limit
-    FREE_DECISIONS       = var.free_decisions
+    ENVIRONMENT             = local.env
+    COGNITO_USER_POOL_ID    = module.cognito.user_pool_id
+    COGNITO_CLIENT_ID       = module.cognito.client_id
+    DSQL_ENDPOINT           = module.dsql.endpoint
+    OPENROUTER_API_KEY      = var.openrouter_api_key
+    DAILY_DECISION_LIMIT    = var.daily_decision_limit
+    FREE_DECISIONS          = var.free_decisions
+    COGNITO_ADMIN_CLIENT_ID = module.cognito.admin_client_id
+    CONTENT_BUCKET          = module.content_cdn.bucket
+    ADMIN_ORIGINS           = var.admin_origins
+    CONTENT_BASE_URL        = module.content_cdn.base_url
   }
 }
 
@@ -65,6 +81,12 @@ module "api_gateway" {
   api_name    = "${local.app_name}-api-${local.env}"
   lambda_arn  = module.lambda.function_arn
   lambda_name = module.lambda.function_name
+}
+
+# Browser origins of the admin page (comma-separated), for CORS.
+variable "admin_origins" {
+  type    = string
+  default = "https://missale-admin.vercel.app,http://localhost:3000"
 }
 
 variable "openrouter_api_key" {
@@ -85,5 +107,7 @@ variable "daily_decision_limit" {
 }
 
 output "api_endpoint" { value = module.api_gateway.api_endpoint }
+output "content_base_url" { value = module.content_cdn.base_url }
+output "user_pool_id" { value = module.cognito.user_pool_id }
 output "dsql_endpoint" { value = module.dsql.endpoint }
 output "lambda_role_arn" { value = module.lambda.role_arn }

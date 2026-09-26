@@ -8,10 +8,17 @@ import (
 	"github.com/reangeline/missale-backend/internal/core/domain"
 )
 
-const maxBodyBytes = 64 << 10
+const (
+	maxBodyBytes      = 64 << 10
+	maxAdminBodyBytes = 512 << 10 // a content item with long texts
+)
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	return decodeJSONLimit(w, r, v, maxBodyBytes)
+}
+
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	dec.DisallowUnknownFields()
 	return dec.Decode(v) == nil
 }
@@ -42,11 +49,21 @@ func respondDomainError(w http.ResponseWriter, err error) (status int) {
 		{domain.ErrInvalidState, http.StatusBadRequest},
 		{domain.ErrInvalidQuestions, http.StatusBadRequest},
 		{domain.ErrDecisionEngine, http.StatusBadGateway},
+		{domain.ErrForbidden, http.StatusForbidden},
+		{domain.ErrInvalidCredentials, http.StatusUnauthorized},
+		{domain.ErrUnknownCollection, http.StatusNotFound},
+		{domain.ErrUnknownLanguage, http.StatusNotFound},
+		{domain.ErrNotFound, http.StatusNotFound},
 	} {
 		if errors.Is(err, m.err) {
 			RespondError(w, m.status, m.err.Error())
 			return m.status
 		}
+	}
+	// The admin page shows why an item was refused ("quote" is required…).
+	if errors.Is(err, domain.ErrInvalidContent) {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": domain.ErrInvalidContent.Error(), "detail": err.Error()})
+		return http.StatusBadRequest
 	}
 	RespondError(w, http.StatusInternalServerError, "internal_error")
 	return http.StatusInternalServerError
