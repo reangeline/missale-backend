@@ -98,7 +98,9 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
   const res = await fetchWithRetry(`${API_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      // Only with a body: a GET with Content-Type makes the browser ask CORS
+      // for one more header than it needs.
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
