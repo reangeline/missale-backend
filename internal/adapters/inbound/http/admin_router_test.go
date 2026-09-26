@@ -129,6 +129,19 @@ func TestAdminCORSAllowsOnlyTheAdminPage(t *testing.T) {
 		r.ServeHTTP(rec, req)
 		return rec.Header().Get("Access-Control-Allow-Origin")
 	}
+
+	// Exactly as Chrome asks for an authed JSON call: both headers, comma,
+	// no space. Every requested header must come back allowed.
+	req := httptest.NewRequest("OPTIONS", "/v1/admin/content/saints/pt/agostinho", nil)
+	req.Header.Set("Origin", "https://admin.missale.app")
+	req.Header.Set("Access-Control-Request-Method", "PUT")
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	allowed := strings.ToLower(rec.Header().Get("Access-Control-Allow-Headers"))
+	if !strings.Contains(allowed, "authorization") || !strings.Contains(allowed, "content-type") {
+		t.Fatalf("preflight for authorization,content-type allowed only %q", allowed)
+	}
 	if got := preflight("https://admin.missale.app"); got != "https://admin.missale.app" {
 		t.Fatalf("admin page origin not allowed: %q", got)
 	}

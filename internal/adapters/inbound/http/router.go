@@ -46,7 +46,12 @@ func NewRouter(auth inbound.AuthService, account inbound.AccountService, decisio
 			r.Use(cors.Handler(cors.Options{
 				AllowedOrigins: admin.Origins,
 				AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-				AllowedHeaders: []string{"Authorization", "Content-Type"},
+				// "*" echoes whatever headers the browser asks for. With an
+				// explicit list, go-chi/cors granted only the first of a
+				// comma-separated request ("authorization,content-type", as
+				// Chrome sends it) and the browser blocked every authed call.
+				// The origin list above is what restricts access.
+				AllowedHeaders: []string{"*"},
 				MaxAge:         600,
 			}))
 			r.Post("/auth/signin", h.SignIn)
