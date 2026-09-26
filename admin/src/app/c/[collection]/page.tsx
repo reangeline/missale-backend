@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Header } from "@/components/header";
+import { AppShell } from "@/components/app-shell";
 import { ItemEditor } from "@/components/item-editor";
 import { useAdmin } from "@/components/use-admin";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,9 @@ export default function CollectionPage() {
   // null while a language is loading.
   const [items, setItems] = useState<Item[] | null>(null);
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<Item | "new" | null>(null);
+  // "+ Novo" on the overview opens the form straight away (?novo=1).
+  const searchParams = useSearchParams();
+  const [editing, setEditing] = useState<Item | "new" | null>(() => (searchParams.get("novo") ? "new" : null));
 
   useEffect(() => {
     if (!email) return;
@@ -63,9 +65,7 @@ export default function CollectionPage() {
   if (!email) return null;
 
   return (
-    <>
-      <Header email={email} />
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-4 p-4">
+    <AppShell email={email}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <Link href="/" className="text-sm text-muted-foreground hover:underline">← Coleções</Link>
@@ -122,12 +122,13 @@ export default function CollectionPage() {
             </TableBody>
           </Table>
         </div>
-        <p className="text-xs text-muted-foreground">{filtered.length} de {items?.length ?? 0} itens · a ordem é a que o app usa.</p>
-      </main>
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} de {items?.length ?? 0} itens · clique numa linha para ver e editar · a ordem é a que o app usa.
+        </p>
 
       {collection && (
         <ItemEditor collection={collection} lang={lang} item={editing} onClose={() => setEditing(null)} onSaved={reload} />
       )}
-    </>
+    </AppShell>
   );
 }

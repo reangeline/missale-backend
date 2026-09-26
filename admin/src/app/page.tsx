@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Header } from "@/components/header";
+import { AppShell } from "@/components/app-shell";
 import { useAdmin } from "@/components/use-admin";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -53,9 +53,7 @@ export default function Home() {
   const last = releases[0];
 
   return (
-    <>
-      <Header email={email} />
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4">
+    <AppShell email={email}>
         <Card>
           <CardHeader>
             <CardTitle>Publicar no app</CardTitle>
@@ -90,26 +88,35 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <h2 className="text-lg font-semibold">Conteúdo do app</h2>
+          <p className="text-sm text-muted-foreground">
+            Abra uma coleção para ver tudo o que o app tem, editar e criar itens novos. O menu à esquerda leva a qualquer uma delas.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {collections.map((c) => (
-            <Link key={c.key} href={`/c/${c.key}`}>
-              <Card className="h-full transition-colors hover:border-primary/40">
-                <CardHeader>
-                  <CardTitle>{c.label}</CardTitle>
-                  <CardDescription>{c.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex gap-2">
+            <Card key={c.key} className="h-full">
+              <CardHeader>
+                <CardTitle>{c.label}</CardTitle>
+                <CardDescription>{c.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <div className="flex flex-wrap gap-2">
                   {LANGUAGES.map((l) => (
                     <Badge key={l.key} variant="secondary">
                       {l.key.toUpperCase()} · {counts[c.key]?.[l.key] ?? "…"}
                     </Badge>
                   ))}
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+                <div className="flex gap-2">
+                  <Link href={`/c/${c.key}`} className={buttonVariants({ size: "sm" })}>Ver e editar</Link>
+                  <Link href={`/c/${c.key}?novo=1`} className={buttonVariants({ size: "sm", variant: "outline" })}>+ Novo</Link>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
-      </main>
-    </>
+    </AppShell>
   );
 }
