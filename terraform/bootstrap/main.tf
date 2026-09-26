@@ -53,6 +53,7 @@ resource "aws_iam_role" "deploy" {
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.repo}:ref:refs/heads/develop",
             "repo:${local.repo}:ref:refs/heads/main",
+            "repo:${local.repo}:environment:production",
             "repo:${local.repo}:pull_request",
           ]
         }
