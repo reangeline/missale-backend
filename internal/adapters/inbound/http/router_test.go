@@ -48,6 +48,18 @@ func (f *fakeAuth) Verify(_ context.Context, token string) (domain.Principal, er
 	return domain.Principal{UserID: "user-1", Username: "apple_001.abc"}, nil
 }
 
+// fakeRevoker stands in for Apple: codes ending in "-bad" fail, everything
+// else succeeds and is remembered.
+type fakeRevoker struct{ revoked []string }
+
+func (f *fakeRevoker) Revoke(_ context.Context, code string) error {
+	if strings.HasSuffix(code, "-bad") {
+		return errors.New("apple refused the code")
+	}
+	f.revoked = append(f.revoked, code)
+	return nil
+}
+
 type fakeUsers struct{ saved, deleted []string }
 
 func (f *fakeUsers) Save(_ context.Context, u domain.User) error {
@@ -92,21 +104,23 @@ func (f *fakeJev) Decide(_ context.Context, state string, _ map[string]domain.Qu
 }
 
 type fixture struct {
-	router http.Handler
-	auth   *fakeAuth
-	users  *fakeUsers
-	usage  *fakeUsage
-	jev    *fakeJev
+	router  http.Handler
+	auth    *fakeAuth
+	users   *fakeUsers
+	usage   *fakeUsage
+	jev     *fakeJev
+	revoker *fakeRevoker
 }
 
 func newFixture() fixture {
-	f := fixture{auth: &fakeAuth{}, users: &fakeUsers{}, usage: &fakeUsage{}, jev: &fakeJev{}}
+	f := fixture{auth: &fakeAuth{}, users: &fakeUsers{}, usage: &fakeUsage{}, jev: &fakeJev{}, revoker: &fakeRevoker{}}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.router = NewRouter(
 		service.NewAuthService(fakeIdentity{}, f.auth, f.users),
-		service.NewAccountService(f.auth, f.users),
+		service.NewAccountService(f.auth, f.users, f.revoker, log),
 		service.NewDecisionService(fakeSubs{}, f.usage, f.jev, 5, 2),
 		nil,
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		log,
 	)
 	return f
 }
@@ -244,5 +258,36 @@ func TestDeleteAccount(t *testing.T) {
 	}
 	if len(f.users.deleted) != 1 || f.users.deleted[0] != "user-1" || len(f.auth.deleted) != 1 || f.auth.deleted[0] != "apple_001.abc" {
 		t.Fatalf("not fully deleted: rows %v, cognito %v", f.users.deleted, f.auth.deleted)
+	}
+	if len(f.revoker.revoked) != 0 {
+		t.Fatalf("old app versions send no authorizationCode; revoker should not run, got %v", f.revoker.revoked)
+	}
+}
+
+// TestDeleteAccountRevokesTheAppleToken covers guideline 5.1.1(v): a fresh
+// authorizationCode sent with the delete request is revoked with Apple.
+func TestDeleteAccountRevokesTheAppleToken(t *testing.T) {
+	f := newFixture()
+	rec, _ := do(t, f.router, "DELETE", "/v1/account", `{"authorizationCode":"the-code"}`,
+		map[string]string{"Authorization": "Bearer access"})
+	if rec.Code != 204 {
+		t.Fatalf("delete: %d", rec.Code)
+	}
+	if len(f.revoker.revoked) != 1 || f.revoker.revoked[0] != "the-code" {
+		t.Fatalf("revoker.revoked = %v", f.revoker.revoked)
+	}
+}
+
+// TestDeleteAccountSucceedsWhenAppleRevocationFails: our deletion must not
+// depend on Apple being reachable.
+func TestDeleteAccountSucceedsWhenAppleRevocationFails(t *testing.T) {
+	f := newFixture()
+	rec, _ := do(t, f.router, "DELETE", "/v1/account", `{"authorizationCode":"stale-bad"}`,
+		map[string]string{"Authorization": "Bearer access"})
+	if rec.Code != 204 {
+		t.Fatalf("delete: %d, expected success even though Apple revocation fails", rec.Code)
+	}
+	if len(f.users.deleted) != 1 || len(f.auth.deleted) != 1 {
+		t.Fatalf("account was not fully deleted: rows %v, cognito %v", f.users.deleted, f.auth.deleted)
 	}
 }

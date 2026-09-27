@@ -68,13 +68,14 @@ func (nopContent) Counts(context.Context) (map[string]map[string]int, error) {
 }
 
 func adminRouter() http.Handler {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	return NewRouter(
 		service.NewAuthService(fakeIdentity{}, &fakeAuth{}, &fakeUsers{}),
-		service.NewAccountService(&fakeAuth{}, &fakeUsers{}),
+		service.NewAccountService(&fakeAuth{}, &fakeUsers{}, &fakeRevoker{}, log),
 		service.NewDecisionService(fakeSubs{}, &fakeUsage{}, &fakeJev{}, 5, 2),
 		&AdminRoutes{Auth: service.NewAdminAuthService(fakeAdminAuth{}), Content: nopContent{},
 			Origins: []string{"https://admin.missale.app"}},
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		log,
 	)
 }
 
