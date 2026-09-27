@@ -32,6 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	// Outbound adapters
 	pool, err := dsql.Open(ctx, awsCfg, cfg.DSQLEndpoint, cfg.AWSRegion)
@@ -47,10 +48,11 @@ func main() {
 		log.Fatal(err)
 	}
 	decisionEngine := jev.NewClient(cfg.OpenRouterAPIKey, cfg.JevModel)
+	tokenRevoker := apple.NewTokenRevoker(ctx, awsCfg, cfg.AppleSigninKeySecret, cfg.AppleSigninKeyID, cfg.AppleTeamID, cfg.BundleID, logger)
 
 	// Application services
 	authService := appservice.NewAuthService(identityVerifier, authProvider, userRepo)
-	accountService := appservice.NewAccountService(authProvider, userRepo)
+	accountService := appservice.NewAccountService(authProvider, userRepo, tokenRevoker, logger)
 	decisionService := appservice.NewDecisionService(subscriptionVerifier, usageRepo, decisionEngine, cfg.DailyDecisionLimit, cfg.FreeDecisions)
 
 	var adminRoutes *httpAdapter.AdminRoutes
@@ -66,8 +68,7 @@ func main() {
 	}
 
 	// Inbound adapter
-	router := httpAdapter.NewRouter(authService, accountService, decisionService, adminRoutes,
-		slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	router := httpAdapter.NewRouter(authService, accountService, decisionService, adminRoutes, logger)
 
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {
 		log.Println("listening on :8080")

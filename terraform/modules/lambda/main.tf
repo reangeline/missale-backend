@@ -46,6 +46,13 @@ resource "aws_iam_role_policy" "access" {
         Action   = ["dsql:DbConnect"]
         Resource = var.dsql_cluster_arn
       },
+      {
+        # Sign in with Apple private key, read once at cold start to revoke
+        # the token on account deletion (guideline 5.1.1(v)).
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = var.apple_signin_key_secret_arn
+      },
     ]
   })
 }
