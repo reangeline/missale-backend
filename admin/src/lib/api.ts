@@ -100,7 +100,10 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
     headers: {
       // Only with a body: a GET with Content-Type makes the browser ask CORS
       // for one more header than it needs.
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      // A plain-text content type is CORS-safelisted and the API decodes the
+      // JSON body independently of this header. This keeps authenticated
+      // writes working behind API Gateway, which only echoes Authorization.
+      ...(init.body ? { "Content-Type": "text/plain;charset=UTF-8" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
