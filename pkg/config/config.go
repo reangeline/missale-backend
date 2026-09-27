@@ -36,6 +36,17 @@ type Config struct {
 	ContentBaseURL string
 	// AdminOrigins are the browser origins of the admin page (comma-separated).
 	AdminOrigins []string
+
+	// Sign in with Apple token revocation on account deletion (guideline
+	// 5.1.1(v)). All optional: without AppleSigninKeySecret, revocation is
+	// skipped (logged as a warning) and deletion still works.
+	// AppleSigninKeySecret is the Secrets Manager secret name holding the
+	// .p8 private key, e.g. "missale/dev/apple-signin-key".
+	AppleSigninKeySecret string
+	// AppleSigninKeyID is that key's id in the Apple Developer portal.
+	AppleSigninKeyID string
+	// AppleTeamID is the Apple Developer team id.
+	AppleTeamID string
 }
 
 func Load() (Config, error) {
@@ -68,6 +79,9 @@ func Load() (Config, error) {
 			c.AdminOrigins = append(c.AdminOrigins, o)
 		}
 	}
+	c.AppleSigninKeySecret = os.Getenv("APPLE_SIGNIN_KEY_SECRET")
+	c.AppleSigninKeyID = os.Getenv("APPLE_SIGNIN_KEY_ID")
+	c.AppleTeamID = os.Getenv("APPLE_TEAM_ID")
 	for name, value := range map[string]string{
 		"COGNITO_USER_POOL_ID": c.CognitoUserPoolID,
 		"COGNITO_CLIENT_ID":    c.CognitoClientID,

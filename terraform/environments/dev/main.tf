@@ -28,6 +28,10 @@ provider "aws" {
 locals {
   app_name = "missale"
   env      = "dev"
+  # The owner creates this secret by hand (the .p8 key is not in Terraform
+  # state); the wildcard covers the random suffix Secrets Manager appends.
+  apple_signin_key_secret     = "missale/${local.env}/apple-signin-key"
+  apple_signin_key_secret_arn = "arn:aws:secretsmanager:us-east-1:${data.aws_caller_identity.current.account_id}:secret:${local.apple_signin_key_secret}-*"
 }
 
 module "cognito" {
@@ -54,12 +58,13 @@ module "content_cdn" {
 }
 
 module "lambda" {
-  source             = "../../modules/lambda"
-  function_name      = "${local.app_name}-api-${local.env}"
-  source_file        = "../../../build/api.zip"
-  cognito_pool_arn   = module.cognito.user_pool_arn
-  dsql_cluster_arn   = module.dsql.arn
-  content_bucket_arn = module.content_cdn.bucket_arn
+  source                      = "../../modules/lambda"
+  function_name               = "${local.app_name}-api-${local.env}"
+  source_file                 = "../../../build/api.zip"
+  cognito_pool_arn            = module.cognito.user_pool_arn
+  dsql_cluster_arn            = module.dsql.arn
+  content_bucket_arn          = module.content_cdn.bucket_arn
+  apple_signin_key_secret_arn = local.apple_signin_key_secret_arn
 
   environment_variables = {
     ENVIRONMENT             = local.env
@@ -73,6 +78,9 @@ module "lambda" {
     CONTENT_BUCKET          = module.content_cdn.bucket
     ADMIN_ORIGINS           = var.admin_origins
     CONTENT_BASE_URL        = module.content_cdn.base_url
+    APPLE_SIGNIN_KEY_SECRET = local.apple_signin_key_secret
+    APPLE_SIGNIN_KEY_ID     = var.apple_signin_key_id
+    APPLE_TEAM_ID           = var.apple_team_id
   }
 }
 
@@ -104,6 +112,19 @@ variable "free_decisions" {
 variable "daily_decision_limit" {
   type    = string
   default = "40"
+}
+
+# Sign in with Apple key id and team id (Apple Developer portal), for token
+# revocation on account deletion (guideline 5.1.1(v)). Not secret by
+# themselves; the private key lives only in Secrets Manager.
+variable "apple_signin_key_id" {
+  type    = string
+  default = "44Y88AA2HY"
+}
+
+variable "apple_team_id" {
+  type    = string
+  default = "3Q524UT33T"
 }
 
 output "api_endpoint" { value = module.api_gateway.api_endpoint }
