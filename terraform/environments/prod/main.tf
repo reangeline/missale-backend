@@ -103,10 +103,11 @@ variable "openrouter_api_key" {
 }
 
 # Lifetime Jev calls per account without a subscription: the onboarding's
-# orientação uses two.
+# orientação uses two, so six covers going through onboarding three times
+# (reinstalling with the same Apple account) instead of failing on the second.
 variable "free_decisions" {
   type    = string
-  default = "2"
+  default = "6"
 }
 
 variable "daily_decision_limit" {
