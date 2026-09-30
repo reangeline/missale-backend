@@ -16,6 +16,18 @@ type Question struct {
 type DecisionRequest struct {
 	State     string              `json:"state"`
 	Questions map[string]Question `json:"questions"`
+	// Free says whether a call without an active subscription may come out
+	// of the account's free allowance. Only the onboarding's orientação sends
+	// true; the other features send false and get ErrNotSubscribed without
+	// spending anything. Absent (nil), for app builds that predate the field,
+	// it behaves as true.
+	Free *bool `json:"free,omitempty"`
+}
+
+// MaySpendFree tells whether the request allows spending the free allowance:
+// true when Free is absent (the old contract) or true.
+func (r DecisionRequest) MaySpendFree() bool {
+	return r.Free == nil || *r.Free
 }
 
 // Limits on what the app may forward, so the proxy can't be used as an

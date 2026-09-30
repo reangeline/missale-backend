@@ -82,3 +82,8 @@ make migrate ENV=dev                  # tabelas e papel missale_api no DSQL (pod
 
 Planos do Terraform (`*.tfplan`) guardam as variáveis, inclusive a chave do
 OpenRouter: ficam fora do git.
+
+O `make migrate` reaplica todo `migrations/*.sql` a cada deploy, então esses
+arquivos precisam ser idempotentes. Mudança de dados que não pode se repetir
+(um reset, por exemplo) vai num `*.once.sql`, só com DML: roda uma vez por
+cluster e fica registrada na tabela `schema_once`.

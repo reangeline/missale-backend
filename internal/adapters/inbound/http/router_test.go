@@ -13,6 +13,7 @@ import (
 
 	"github.com/reangeline/missale-backend/internal/application/service"
 	"github.com/reangeline/missale-backend/internal/core/domain"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
 )
 
 // Real application services behind the router; only the outbound ports are fake.
@@ -71,16 +72,22 @@ func (f *fakeUsers) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+// fakeUsage keeps the repository's contract: a limit already reached is
+// refused and nothing is counted.
 type fakeUsage struct{ calls, free int }
 
-func (f *fakeUsage) Reserve(context.Context, string) (int, error) {
+func (f *fakeUsage) Reserve(_ context.Context, r outbound.Reservation) error {
+	if r.SpendFree && f.free >= r.FreeLimit {
+		return domain.ErrNotSubscribed
+	}
+	if f.calls >= r.DailyLimit {
+		return domain.ErrDailyLimit
+	}
+	if r.SpendFree {
+		f.free++
+	}
 	f.calls++
-	return f.calls, nil
-}
-
-func (f *fakeUsage) ReserveFree(context.Context, string) (int, error) {
-	f.free++
-	return f.free, nil
+	return nil
 }
 
 type fakeSubs struct{}
@@ -210,6 +217,47 @@ func TestAForgedSubscriptionIsRefusedWithoutSpendingTheAllowance(t *testing.T) {
 	}
 }
 
+// withFree adds the optional "free" field to validDecision.
+func withFree(v string) string {
+	return `{"free":` + v + `,` + strings.TrimPrefix(validDecision, "{")
+}
+
+// The optional "free" field is accepted (DisallowUnknownFields would turn an
+// unknown field into 400); a body without it keeps the old contract.
+func TestDecisionsAcceptTheFreeField(t *testing.T) {
+	for _, body := range []string{validDecision, withFree("true"), withFree("false")} {
+		f := newFixture()
+		if rec, out := do(t, f.router, "POST", "/v1/decisions", body, authed); rec.Code != 200 || out["answers"] == nil {
+			t.Fatalf("subscriber, body %.20q: %d %v", body, rec.Code, out)
+		}
+		if f.usage.free != 0 || f.usage.calls != 1 {
+			t.Fatalf("subscriber, body %.20q: free %d, calls %d", body, f.usage.free, f.usage.calls)
+		}
+	}
+}
+
+// Without a subscription, free:false gets 402 without spending anything;
+// free:true and an absent field spend the allowance as before.
+func TestDecisionsFreeFieldWithoutSubscription(t *testing.T) {
+	noSub := map[string]string{"Authorization": "Bearer access"}
+	f := newFixture() // free allowance 2
+	rec, out := do(t, f.router, "POST", "/v1/decisions", withFree("false"), noSub)
+	if rec.Code != 402 || out["error"] != "subscription_required" {
+		t.Fatalf("free:false: %d %v", rec.Code, out)
+	}
+	if f.usage.free != 0 || f.usage.calls != 0 || len(f.jev.states) != 0 {
+		t.Fatalf("free:false spent: free %d, calls %d, Jev %d", f.usage.free, f.usage.calls, len(f.jev.states))
+	}
+	for _, body := range []string{withFree("true"), validDecision} {
+		if rec, out := do(t, f.router, "POST", "/v1/decisions", body, noSub); rec.Code != 200 {
+			t.Fatalf("body %.20q: %d %v", body, rec.Code, out)
+		}
+	}
+	if f.usage.free != 2 || len(f.jev.states) != 2 {
+		t.Fatalf("free %d, Jev %d; want 2, 2", f.usage.free, len(f.jev.states))
+	}
+}
+
 func TestDecisionsDailyLimit(t *testing.T) {
 	f := newFixture() // limit 5
 	for i := 0; i < 5; i++ {
@@ -239,6 +287,7 @@ func TestDecisionsRejectOversizedOrMalformedRequests(t *testing.T) {
 		"one option":     `{"state":"oi","questions":{"a":{"type":"choice","instructions":"q","criteria":{"x":"y"}}}}`,
 		"33 options":     `{"state":"oi","questions":{"a":{"type":"choice","instructions":"q","criteria":` + many + `}}}`,
 		"model override": `{"state":"oi","model":"gpt","questions":{"a":{"type":"noul","instructions":"q"}}}`,
+		"free not bool":  `{"state":"oi","free":"yes","questions":{"a":{"type":"noul","instructions":"q"}}}`,
 	}
 	for name, body := range bad {
 		if rec, _ := do(t, f.router, "POST", "/v1/decisions", body, authed); rec.Code != 400 {
