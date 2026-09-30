@@ -103,10 +103,11 @@ variable "openrouter_api_key" {
 }
 
 # Lifetime Jev calls per account without a subscription: the onboarding's
-# orientação uses two.
+# orientação uses two. Generous here: dev serves TestFlight, whose testers
+# go through onboarding again and again with the same account.
 variable "free_decisions" {
   type    = string
-  default = "2"
+  default = "50"
 }
 
 variable "daily_decision_limit" {
