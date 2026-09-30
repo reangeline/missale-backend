@@ -13,6 +13,7 @@ import (
 
 	"github.com/reangeline/missale-backend/internal/application/service"
 	"github.com/reangeline/missale-backend/internal/core/domain"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
 )
 
 // Real application services behind the router; only the outbound ports are fake.
@@ -71,16 +72,22 @@ func (f *fakeUsers) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+// fakeUsage keeps the repository's contract: a limit already reached is
+// refused and nothing is counted.
 type fakeUsage struct{ calls, free int }
 
-func (f *fakeUsage) Reserve(context.Context, string) (int, error) {
+func (f *fakeUsage) Reserve(_ context.Context, r outbound.Reservation) error {
+	if r.SpendFree && f.free >= r.FreeLimit {
+		return domain.ErrNotSubscribed
+	}
+	if f.calls >= r.DailyLimit {
+		return domain.ErrDailyLimit
+	}
+	if r.SpendFree {
+		f.free++
+	}
 	f.calls++
-	return f.calls, nil
-}
-
-func (f *fakeUsage) ReserveFree(context.Context, string) (int, error) {
-	f.free++
-	return f.free, nil
+	return nil
 }
 
 type fakeSubs struct{}
