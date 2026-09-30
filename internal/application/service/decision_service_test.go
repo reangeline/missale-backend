@@ -202,3 +202,95 @@ type failingUsage struct{}
 func (failingUsage) Reserve(context.Context, outbound.Reservation) error {
 	return errors.New("connection reset")
 }
+
+func freeFlag(b bool) *bool { return &b }
+
+func decideFree(s interface {
+	Decide(context.Context, domain.Principal, string, domain.DecisionRequest) (json.RawMessage, error)
+}, user, jws string, free *bool) error {
+	req := okDecision
+	req.Free = free
+	_, err := s.Decide(context.Background(), domain.Principal{UserID: user}, jws, req)
+	return err
+}
+
+// Only the onboarding's orientação spends the free allowance (free: true, or
+// absent for app builds that predate the field). free: false without an
+// active subscription is refused before anything is reserved or sent to Jev.
+func TestFreeFlagWithoutSubscription(t *testing.T) {
+	for _, jws := range []string{"", "expired"} {
+		cases := []struct {
+			name              string
+			free              *bool
+			wantErr           error
+			reserves, fr, day int
+			jev               int
+		}{
+			{"absent", nil, nil, 1, 1, 1, 1},
+			{"true", freeFlag(true), nil, 1, 1, 1, 1},
+			{"false", freeFlag(false), domain.ErrNotSubscribed, 0, 0, 0, 0},
+		}
+		for _, c := range cases {
+			usage, jev := newMemUsage(), &decisionEngine{}
+			s := NewDecisionService(decisionSubs{}, usage, jev, 40, 6)
+			err := decideFree(s, "u1", jws, c.free)
+			if c.wantErr == nil && err != nil || c.wantErr != nil && !errors.Is(err, c.wantErr) {
+				t.Fatalf("jws %q, free %s: err %v, want %v", jws, c.name, err, c.wantErr)
+			}
+			if usage.reserves != c.reserves || usage.free["u1"] != c.fr || usage.daily["u1"] != c.day || jev.calls != c.jev {
+				t.Fatalf("jws %q, free %s: reserves %d, free %d, daily %d, Jev %d; want %d, %d, %d, %d",
+					jws, c.name, usage.reserves, usage.free["u1"], usage.daily["u1"], jev.calls,
+					c.reserves, c.fr, c.day, c.jev)
+			}
+		}
+	}
+}
+
+// free: false does not touch the allowance even when it is still whole: a
+// later onboarding orientação gets all of it.
+func TestFreeFalseLeavesTheAllowanceForTheOnboarding(t *testing.T) {
+	usage, jev := newMemUsage(), &decisionEngine{}
+	s := NewDecisionService(decisionSubs{}, usage, jev, 40, 2)
+	for i := 0; i < 5; i++ {
+		if err := decideFree(s, "u1", "", freeFlag(false)); !errors.Is(err, domain.ErrNotSubscribed) {
+			t.Fatalf("free:false call %d: %v", i, err)
+		}
+	}
+	for i := 0; i < 2; i++ {
+		if err := decideFree(s, "u1", "", freeFlag(true)); err != nil {
+			t.Fatalf("onboarding call %d after free:false refusals: %v", i, err)
+		}
+	}
+	if usage.free["u1"] != 2 || usage.daily["u1"] != 2 || jev.calls != 2 {
+		t.Fatalf("free %d, daily %d, Jev %d; want 2, 2, 2", usage.free["u1"], usage.daily["u1"], jev.calls)
+	}
+}
+
+// For a subscriber the flag changes nothing: the call counts against the daily
+// limit only, never the free allowance (which here is zero).
+func TestFreeFlagDoesNotAffectASubscriber(t *testing.T) {
+	for name, free := range map[string]*bool{"absent": nil, "true": freeFlag(true), "false": freeFlag(false)} {
+		usage, jev := newMemUsage(), &decisionEngine{}
+		s := NewDecisionService(decisionSubs{}, usage, jev, 40, 0)
+		if err := decideFree(s, "u1", "subscribed", free); err != nil {
+			t.Fatalf("subscriber, free %s: %v", name, err)
+		}
+		if usage.free["u1"] != 0 || usage.daily["u1"] != 1 || jev.calls != 1 {
+			t.Fatalf("subscriber, free %s: free %d, daily %d, Jev %d", name, usage.free["u1"], usage.daily["u1"], jev.calls)
+		}
+	}
+}
+
+// A forged subscription is refused before counting whatever the flag says.
+func TestForgedSubscriptionIsRefusedWhateverTheFreeFlag(t *testing.T) {
+	for name, free := range map[string]*bool{"absent": nil, "true": freeFlag(true), "false": freeFlag(false)} {
+		usage, jev := newMemUsage(), &decisionEngine{}
+		s := NewDecisionService(decisionSubs{}, usage, jev, 40, 6)
+		if err := decideFree(s, "u1", "forged", free); !errors.Is(err, domain.ErrNotSubscribed) {
+			t.Fatalf("forged, free %s: %v", name, err)
+		}
+		if usage.reserves != 0 || jev.calls != 0 {
+			t.Fatalf("forged, free %s: reserves %d, Jev %d", name, usage.reserves, jev.calls)
+		}
+	}
+}
