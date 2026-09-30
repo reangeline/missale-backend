@@ -36,6 +36,12 @@ func (s *decisionService) Decide(ctx context.Context, p domain.Principal, subscr
 	if err != nil {
 		return nil, err
 	}
+	// Only the onboarding's orientação may spend the free allowance: a call
+	// that opts out (free: false) without an active subscription is refused
+	// before anything is counted, neither the allowance nor the daily limit.
+	if spendFree && !req.MaySpendFree() {
+		return nil, domain.ErrNotSubscribed
+	}
 	// Both limits are checked and counted together, before calling Jev: a
 	// refusal by either counts nothing, but a call Jev then fails still
 	// spends one (simpler, and it has not happened in production).
