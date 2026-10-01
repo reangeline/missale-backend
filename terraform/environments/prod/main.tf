@@ -72,6 +72,7 @@ module "lambda" {
     COGNITO_CLIENT_ID       = module.cognito.client_id
     DSQL_ENDPOINT           = module.dsql.endpoint
     OPENROUTER_API_KEY      = var.openrouter_api_key
+    ANTHROPIC_API_KEY       = var.anthropic_api_key
     DAILY_DECISION_LIMIT    = var.daily_decision_limit
     FREE_DECISIONS          = var.free_decisions
     COGNITO_ADMIN_CLIENT_ID = module.cognito.admin_client_id
@@ -102,12 +103,19 @@ variable "openrouter_api_key" {
   sensitive = true
 }
 
-# Lifetime Jev calls per account without a subscription: the onboarding's
-# orientação uses two, so six covers going through onboarding three times
+# Claude (Anthropic API) writes the padre's reflection. Empty disables
+# POST /v1/reflections (503) without taking the API down.
+variable "anthropic_api_key" {
+  type      = string
+  sensitive = true
+}
+
+# Lifetime paid calls per account without a subscription: the onboarding's
+# orientação uses three (two Jev calls and the padre's reflection), so nine covers going through onboarding three times
 # (reinstalling with the same Apple account) instead of failing on the second.
 variable "free_decisions" {
   type    = string
-  default = "6"
+  default = "9"
 }
 
 variable "daily_decision_limit" {

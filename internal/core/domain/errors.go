@@ -12,6 +12,10 @@ var (
 	ErrInvalidQuestions  = errors.New("invalid_questions")
 	ErrDecisionEngine    = errors.New("jev_unavailable")
 
+	ErrInvalidReflection    = errors.New("invalid_reflection")
+	ErrReflectionEngine     = errors.New("reflection_unavailable")
+	ErrReflectionNotEnabled = errors.New("reflection_not_configured")
+
 	ErrForbidden          = errors.New("forbidden")
 	ErrInvalidCredentials = errors.New("invalid_credentials")
 	ErrUnknownCollection  = errors.New("unknown_collection")
