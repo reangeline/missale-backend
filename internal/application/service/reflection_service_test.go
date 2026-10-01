@@ -145,6 +145,8 @@ func TestValidateReflection(t *testing.T) {
 		"no name":          {mut(func(r *domain.ReflectionRequest) { r.Saint.Name = "" }), domain.ErrInvalidReflection},
 		"passage too long": {mut(func(r *domain.ReflectionRequest) { r.Passage.Text = strings.Repeat("a", domain.MaxPassageChars+1) }), domain.ErrInvalidReflection},
 		"summary too long": {mut(func(r *domain.ReflectionRequest) { r.Saint.Summary = strings.Repeat("a", domain.MaxSummaryChars+1) }), domain.ErrInvalidReflection},
+		"context at limit": {mut(func(r *domain.ReflectionRequest) { r.Context = strings.Repeat("é", domain.MaxContextChars) }), nil},
+		"context too long": {mut(func(r *domain.ReflectionRequest) { r.Context = strings.Repeat("é", domain.MaxContextChars+1) }), domain.ErrInvalidReflection},
 		"language":         {mut(func(r *domain.ReflectionRequest) { r.Language = "fr" }), domain.ErrInvalidReflection},
 	}
 	for name, c := range cases {
