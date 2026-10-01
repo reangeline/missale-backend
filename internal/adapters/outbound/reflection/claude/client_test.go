@@ -227,9 +227,18 @@ func TestWriteWithoutCrisisHasNoCrisisBlock(t *testing.T) {
 }
 
 func TestCrisisPromptContent(t *testing.T) {
-	for _, want := range []string{"amor de Deus", "não precisa passar por isso sozinha", "paróquia próxima", "serviço de emergência local", "não dê números de telefone"} {
+	for _, want := range []string{"amor de Deus", "não precisa passar por isso sozinha", "paróquia próxima", "serviço de emergência local", "não dê números de telefone", "nunca apresente a morte como descanso", "não descreva meios", "não substitui, a busca de ajuda"} {
 		if !strings.Contains(strings.ToLower(crisisPrompt), strings.ToLower(want)) {
 			t.Errorf("crisis prompt lacks %q", want)
 		}
+	}
+}
+
+func TestRefusalErrorCarriesNoCategory(t *testing.T) {
+	c := serve(t, 200, `{"id":"msg_1","type":"message","role":"assistant","model":"claude-opus-5-5","stop_reason":"refusal",
+"stop_details":{"type":"refusal","category":"bio","explanation":null},"content":[],"usage":{"input_tokens":1,"output_tokens":0}}`, nil)
+	_, err := c.Write(context.Background(), req)
+	if err == nil || strings.Contains(err.Error(), "bio") {
+		t.Fatalf("err = %v; the refusal category must not reach the logs", err)
 	}
 }

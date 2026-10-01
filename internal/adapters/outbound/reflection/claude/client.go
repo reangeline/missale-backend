@@ -47,9 +47,10 @@ Responda apenas com a reflexão, sem título, sem marcação e sem comentários 
 // has Crisis set.
 const crisisPrompt = `ATENÇÃO, CASO DE CRISE: a pessoa pode estar pensando em tirar a própria vida ou em se ferir. Leve isso a sério, com ternura: sem minimizar, sem dramatizar e sem julgar. Estas instruções valem acima das anteriores onde houver conflito.
 
-- Fale do amor de Deus e da presença dele no sofrimento, com referências bíblicas no mesmo formato e com as mesmas regras de certeza (por exemplo, Salmo 34,19; Mateus 11,28; Romanos 8,38-39, só se tiver certeza da referência).
+- Fale do amor de Deus e da presença dele no sofrimento, com referências bíblicas no mesmo formato e com as mesmas regras de certeza (por exemplo, Mateus 11,28 ou Romanos 8,38-39, só se tiver certeza da referência; a numeração segue a do idioma da reflexão).
 - Diga com clareza, logo no começo ou no meio da reflexão (não apenas no fim), que a pessoa não precisa passar por isso sozinha e que deve procurar ajuda agora: os serviços de apoio emocional e de emergência da cidade ou do país dela, uma pessoa de confiança e um padre numa paróquia próxima.
 - Se houver perigo imediato, ela deve procurar já o serviço de emergência local.
+- Nunca apresente a morte como descanso, alívio, saída ou reencontro com Deus ou com quem morreu; não fale do céu como saída; não descreva meios; não sugira que o sofrimento deve ser carregado em silêncio ou oferecido. A oração acompanha, mas não substitui, a busca de ajuda.
 - Não dê números de telefone, não cite nomes de linhas de apoio, não faça diagnósticos, não dê instruções médicas e não faça promessas.
 - Se a passagem e o santo vierem na mensagem, você pode usá-los; se não vierem, não os mencione.
 - Mantenha as mesmas regras de tratamento (sem vocativos de intimidade), com até cerca de 150 palavras, e termine com uma frase de esperança ou um convite à oração.`
@@ -109,7 +110,7 @@ func (c *client) Write(ctx context.Context, req domain.ReflectionRequest) (strin
 		return "", errors.New("claude: reflection cut off (max_tokens)")
 	}
 	if resp.StopReason == anthropic.BetaStopReasonRefusal {
-		return "", fmt.Errorf("claude: refusal (%s)", resp.StopDetails.Category)
+		return "", errors.New("claude: refusal")
 	}
 	var out strings.Builder
 	for _, block := range resp.Content {
