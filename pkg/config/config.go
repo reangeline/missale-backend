@@ -16,16 +16,22 @@ type Config struct {
 	DSQLEndpoint      string
 	OpenRouterAPIKey  string
 	JevModel          string
+	// AnthropicAPIKey is optional: without it POST /v1/reflections answers
+	// 503 and the rest of the API keeps working.
+	AnthropicAPIKey string
+	// ReflectionModel is the Claude model that writes the reflection.
+	ReflectionModel string
 	// BundleID is both the audience of Apple identity tokens and the bundle
 	// StoreKit transactions must belong to.
 	BundleID string
 	// ProductIDs are the subscriptions that unlock the orientação.
 	ProductIDs []string
-	// DailyDecisionLimit caps Jev calls per user per UTC day. One orientação
-	// uses two calls (state + risk, then the reviewed reply).
+	// DailyDecisionLimit caps paid calls (Jev and the reflection) per user per
+	// UTC day. One orientação uses three: state + risk, the reviewed reply,
+	// then the padre's reflection.
 	DailyDecisionLimit int
 	// FreeDecisions is each account's lifetime allowance without a
-	// subscription (the onboarding's orientação uses two).
+	// subscription (the onboarding's orientação uses three).
 	FreeDecisions int
 
 	// The admin page. Optional: without COGNITO_ADMIN_CLIENT_ID and
@@ -58,6 +64,8 @@ func Load() (Config, error) {
 		DSQLEndpoint:      os.Getenv("DSQL_ENDPOINT"),
 		OpenRouterAPIKey:  os.Getenv("OPENROUTER_API_KEY"),
 		JevModel:          getenv("JEV_MODEL", "typesafe/jev-1.13"),
+		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
+		ReflectionModel:   getenv("REFLECTION_MODEL", "claude-opus-5-5"),
 		BundleID:          getenv("APP_BUNDLE_ID", "com.holymessages.app"),
 		ProductIDs:        []string{"mensal", "anual"},
 	}
@@ -66,7 +74,7 @@ func Load() (Config, error) {
 		return c, fmt.Errorf("DAILY_DECISION_LIMIT: %w", err)
 	}
 	c.DailyDecisionLimit = limit
-	free, err := strconv.Atoi(getenv("FREE_DECISIONS", "2"))
+	free, err := strconv.Atoi(getenv("FREE_DECISIONS", "3"))
 	if err != nil {
 		return c, fmt.Errorf("FREE_DECISIONS: %w", err)
 	}

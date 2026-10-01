@@ -29,7 +29,8 @@ internal/adapters/outbound/decision/jev   Jev via OpenRouter
 | `POST /v1/auth/apple` `{identityToken}` | todos | valida o token da Apple, cria/acha o usuário no Cognito, devolve a sessão |
 | `POST /v1/auth/refresh` `{refreshToken}` | todos | renova o access token |
 | `DELETE /v1/account` | logado | apaga o usuário no banco e no Cognito |
-| `POST /v1/decisions` `{state, questions}` | logado + assinante, ou dentro da cota grátis | repassa ao Jev; header `X-Subscription` = `jwsRepresentation` da transação StoreKit 2. Sem assinatura, cada conta tem `FREE_DECISIONS` (2) chamadas na vida: a orientação do onboarding |
+| `POST /v1/decisions` `{state, questions}` | logado + assinante, ou dentro da cota grátis | repassa ao Jev; header `X-Subscription` = `jwsRepresentation` da transação StoreKit 2. Sem assinatura, cada conta tem `FREE_DECISIONS` (3) chamadas na vida: a orientação do onboarding (2 do Jev + a reflexão) |
+| `POST /v1/reflections` `{state, passage:{reference,text}, saint:{name,summary}, language, free?}` | igual a `/v1/decisions` | reflexão do padre escrita pelo Claude (`ANTHROPIC_API_KEY`, modelo `REFLECTION_MODEL`); responde `{reflection}`; conta 1 uso; 503 sem a chave, 502 se o Claude falhar ou recusar |
 
 - O texto do usuário (`state`) vai para o Jev e para nenhum outro lugar: não é logado nem gravado.
 - O banco guarda só `users` (id, apple_sub), `decision_usage` (chamadas por dia, limite `DAILY_DECISION_LIMIT`) e `free_decisions` (chamadas grátis usadas).

@@ -116,16 +116,18 @@ type fixture struct {
 	users   *fakeUsers
 	usage   *fakeUsage
 	jev     *fakeJev
+	writer  *fakeWriter
 	revoker *fakeRevoker
 }
 
 func newFixture() fixture {
-	f := fixture{auth: &fakeAuth{}, users: &fakeUsers{}, usage: &fakeUsage{}, jev: &fakeJev{}, revoker: &fakeRevoker{}}
+	f := fixture{auth: &fakeAuth{}, users: &fakeUsers{}, usage: &fakeUsage{}, jev: &fakeJev{}, writer: &fakeWriter{}, revoker: &fakeRevoker{}}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.router = NewRouter(
 		service.NewAuthService(fakeIdentity{}, f.auth, f.users),
 		service.NewAccountService(f.auth, f.users, f.revoker, log),
 		service.NewDecisionService(fakeSubs{}, f.usage, f.jev, 5, 2),
+		service.NewReflectionService(fakeSubs{}, f.usage, f.writer, 5, 3),
 		nil,
 		log,
 	)
