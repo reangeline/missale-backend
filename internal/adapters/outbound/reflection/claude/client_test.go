@@ -56,7 +56,7 @@ func TestWriteBuildsTheRequestAndReturnsTheText(t *testing.T) {
 		if _, ok := body["thinking"]; ok {
 			t.Errorf("thinking must not be sent: %v", body["thinking"])
 		}
-		if body["max_tokens"] != float64(2000) {
+		if body["max_tokens"] != float64(maxTokens) {
 			t.Errorf("max_tokens = %v", body["max_tokens"])
 		}
 		if body["fallbacks"] != "default" {
@@ -103,6 +103,19 @@ func TestWriteRejectsAnEmptyReflection(t *testing.T) {
 	c := serve(t, 200, `{"id":"m","type":"message","role":"assistant","model":"x","stop_reason":"max_tokens","stop_details":null,"content":[],"usage":{"input_tokens":1,"output_tokens":0}}`, nil)
 	if _, err := c.Write(context.Background(), req); err == nil {
 		t.Fatal("expected an error")
+	}
+}
+
+func TestWriteRejectsAReflectionCutOffByMaxTokens(t *testing.T) {
+	c := serve(t, 200, `{"id":"m","type":"message","role":"assistant","model":"x","stop_reason":"max_tokens","stop_details":null,"content":[{"type":"text","text":"Você não está sozinho, porque"}],"usage":{"input_tokens":1,"output_tokens":3000}}`, nil)
+	if got, err := c.Write(context.Background(), req); err == nil || got != "" {
+		t.Fatalf("got %q, %v; want an error", got, err)
+	}
+}
+
+func TestSystemPromptKeepsAVerselessReferenceAsItCame(t *testing.T) {
+	if !strings.Contains(systemPrompt, "sem acrescentar versículo") {
+		t.Fatal("o prompt precisa dizer para não inventar versículo numa referência que veio sem ele")
 	}
 }
 
