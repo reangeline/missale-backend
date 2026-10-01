@@ -56,6 +56,21 @@ func TestReflectionsAcceptTheOptionalContext(t *testing.T) {
 	}
 }
 
+func TestReflectionsCrisisWithoutPassageAndSaint(t *testing.T) {
+	f := newFixture()
+	b := `{"state":"Não aguento mais.","crisis":true,"language":"pt"}`
+	if rec, _ := do(t, f.router, "POST", "/v1/reflections", b, authed); rec.Code != 200 {
+		t.Fatalf("crisis: %d", rec.Code)
+	}
+	if len(f.writer.reqs) != 1 || !f.writer.reqs[0].Crisis {
+		t.Fatalf("writer got %+v", f.writer.reqs)
+	}
+	// Without crisis the same body is still invalid.
+	if rec, _ := do(t, f.router, "POST", "/v1/reflections", `{"state":"Não aguento mais.","language":"pt"}`, authed); rec.Code != 400 {
+		t.Fatalf("normal without passage: %d", rec.Code)
+	}
+}
+
 func TestReflectionsFreeAllowanceRules(t *testing.T) {
 	noSub := map[string]string{"Authorization": "Bearer access"}
 	f := newFixture() // free allowance 3 for reflections' service
