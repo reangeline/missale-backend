@@ -22,10 +22,11 @@ type AdminRoutes struct {
 	Origins []string
 }
 
-func NewRouter(auth inbound.AuthService, account inbound.AccountService, decision inbound.DecisionService, admin *AdminRoutes, log *slog.Logger) http.Handler {
+func NewRouter(auth inbound.AuthService, account inbound.AccountService, decision inbound.DecisionService, reflection inbound.ReflectionService, admin *AdminRoutes, log *slog.Logger) http.Handler {
 	authHandler := handler.NewAuthHandler(auth, log)
 	accountHandler := handler.NewAccountHandler(account, log)
 	decisionHandler := handler.NewDecisionHandler(decision, log)
+	reflectionHandler := handler.NewReflectionHandler(reflection, log)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -39,6 +40,7 @@ func NewRouter(auth inbound.AuthService, account inbound.AccountService, decisio
 		r.Use(middleware.AuthMiddleware(auth))
 		r.Delete("/v1/account", accountHandler.Delete)
 		r.Post("/v1/decisions", decisionHandler.Decide)
+		r.Post("/v1/reflections", reflectionHandler.Reflect)
 	})
 	if admin != nil {
 		h := handler.NewAdminHandler(admin.Auth, admin.Content, log)

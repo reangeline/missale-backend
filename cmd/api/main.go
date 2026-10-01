@@ -16,9 +16,11 @@ import (
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/auth/cognito"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/decision/jev"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/persistence/dsql"
+	"github.com/reangeline/missale-backend/internal/adapters/outbound/reflection/claude"
 	s3storage "github.com/reangeline/missale-backend/internal/adapters/outbound/storage/s3"
 	"github.com/reangeline/missale-backend/internal/adapters/outbound/subscription/storekit"
 	appservice "github.com/reangeline/missale-backend/internal/application/service"
+	"github.com/reangeline/missale-backend/internal/core/ports/outbound"
 	appconfig "github.com/reangeline/missale-backend/pkg/config"
 )
 
@@ -48,12 +50,22 @@ func main() {
 		log.Fatal(err)
 	}
 	decisionEngine := jev.NewClient(cfg.OpenRouterAPIKey, cfg.JevModel)
+	// Without ANTHROPIC_API_KEY the reflection route answers 503; the rest of
+	// the API is unaffected.
+	var reflectionWriter outbound.ReflectionWriter
+	if cfg.AnthropicAPIKey != "" {
+		reflectionWriter = claude.NewClient(cfg.AnthropicAPIKey, cfg.ReflectionModel)
+	} else {
+		logger.Warn("ANTHROPIC_API_KEY is not set: /v1/reflections is disabled")
+	}
 	tokenRevoker := apple.NewTokenRevoker(ctx, awsCfg, cfg.AppleSigninKeySecret, cfg.AppleSigninKeyID, cfg.AppleTeamID, cfg.BundleID, logger)
 
 	// Application services
 	authService := appservice.NewAuthService(identityVerifier, authProvider, userRepo)
 	accountService := appservice.NewAccountService(authProvider, userRepo, tokenRevoker, logger)
 	decisionService := appservice.NewDecisionService(subscriptionVerifier, usageRepo, decisionEngine, cfg.DailyDecisionLimit, cfg.FreeDecisions)
+
+	reflectionService := appservice.NewReflectionService(subscriptionVerifier, usageRepo, reflectionWriter, cfg.DailyDecisionLimit, cfg.FreeDecisions)
 
 	var adminRoutes *httpAdapter.AdminRoutes
 	if cfg.CognitoAdminClientID != "" && cfg.ContentBucket != "" {
@@ -68,7 +80,7 @@ func main() {
 	}
 
 	// Inbound adapter
-	router := httpAdapter.NewRouter(authService, accountService, decisionService, adminRoutes, logger)
+	router := httpAdapter.NewRouter(authService, accountService, decisionService, reflectionService, adminRoutes, logger)
 
 	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {
 		log.Println("listening on :8080")
