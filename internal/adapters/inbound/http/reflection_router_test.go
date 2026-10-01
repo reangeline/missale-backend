@@ -45,6 +45,17 @@ func TestReflectionsReturnTheReflectionAndCountOneUse(t *testing.T) {
 	}
 }
 
+func TestReflectionsAcceptTheOptionalContext(t *testing.T) {
+	f := newFixture()
+	b := strings.Replace(validReflection, `"language"`, `"context":"Como reza: pouco\nFé: buscando","language"`, 1)
+	if rec, _ := do(t, f.router, "POST", "/v1/reflections", b, authed); rec.Code != 200 {
+		t.Fatalf("context: %d", rec.Code)
+	}
+	if len(f.writer.reqs) != 1 || f.writer.reqs[0].Context != "Como reza: pouco\nFé: buscando" {
+		t.Fatalf("writer got %+v", f.writer.reqs)
+	}
+}
+
 func TestReflectionsFreeAllowanceRules(t *testing.T) {
 	noSub := map[string]string{"Authorization": "Bearer access"}
 	f := newFixture() // free allowance 3 for reflections' service
@@ -109,6 +120,7 @@ func TestReflectionsRejectInvalidRequests(t *testing.T) {
 		"summary too long": body("oi", "r", "t", "n", long(domain.MaxSummaryChars+1), "pt"),
 		"bad language":     body("oi", "r", "t", "n", "s", "fr"),
 		"no language":      body("oi", "r", "t", "n", "s", ""),
+		"context too long": strings.Replace(validReflection, `"language"`, `"context":"`+long(domain.MaxContextChars+1)+`","language"`, 1),
 		"unknown field":    strings.Replace(validReflection, `"language"`, `"model":"x","language"`, 1),
 		"malformed":        `{`,
 	}

@@ -21,6 +21,9 @@ type ReflectionRequest struct {
 	Passage  Passage `json:"passage"`
 	Saint    Saint   `json:"saint"`
 	Language string  `json:"language"`
+	// Context is optional: the onboarding questionnaire answers, already in
+	// the app's language, one "Question: answer" per line. Never logged.
+	Context string `json:"context,omitempty"`
 	// Free has the same meaning as DecisionRequest.Free.
 	Free *bool `json:"free,omitempty"`
 }
@@ -33,6 +36,8 @@ func (r ReflectionRequest) MaySpendFree() bool {
 const (
 	MaxPassageChars = 4000
 	MaxSummaryChars = 2000
+	// MaxContextChars bounds ReflectionRequest.Context.
+	MaxContextChars = 1500
 	// MaxLabelChars bounds Passage.Reference and Saint.Name.
 	MaxLabelChars = 200
 )

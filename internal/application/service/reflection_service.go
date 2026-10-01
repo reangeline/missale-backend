@@ -64,5 +64,8 @@ func ValidateReflection(req domain.ReflectionRequest) error {
 	if utf8.RuneCountInString(req.Passage.Text) > domain.MaxPassageChars || utf8.RuneCountInString(req.Saint.Summary) > domain.MaxSummaryChars {
 		return domain.ErrInvalidReflection
 	}
+	if utf8.RuneCountInString(req.Context) > domain.MaxContextChars {
+		return domain.ErrInvalidReflection
+	}
 	return nil
 }
