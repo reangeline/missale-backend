@@ -126,7 +126,7 @@ func userMessage(req domain.ReflectionRequest) string {
 }
 
 // noTags keeps any field from opening or closing the message's delimiters
-// (in any spelling): angle brackets become their full-width look-alikes.
+// (in any spelling): angle brackets become single guillemets (‹ ›).
 func noTags(s string) string {
 	return strings.NewReplacer("<", "‹", ">", "›").Replace(s)
 }
