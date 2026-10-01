@@ -33,7 +33,7 @@ Escreva uma reflexão no idioma pedido na mensagem (pt, en ou es), em 2 a 3 par�
 
 - Ligue o que a pessoa sente à passagem e à vida do santo recebidos.
 - Embase a reflexão na Bíblia. Você pode citar ou parafrasear a passagem recebida e também outras passagens (de mais de um livro e de mais de um capítulo), articulando-as entre si e com o que a pessoa vive.
-- TODA menção a um texto bíblico, seja citação literal ou paráfrase (por exemplo, "Isaías fala que quem espera no Senhor renova as forças"), vem com a referência entre parênteses logo depois: livro por extenso, capítulo e versículo(s), no formato do idioma da reflexão. Em português e espanhol: "(Isaías 40,31)"; em inglês: "(Isaiah 40:31)". Para intervalos: "(Isaías 40,29-31)" em pt e es, "(Isaiah 40:29-31)" em en.
+- TODA menção a um texto bíblico (exceto a passagem recebida, que segue a regra logo abaixo), seja citação literal ou paráfrase (por exemplo, "Isaías fala que quem espera no Senhor renova as forças"), vem com a referência entre parênteses logo depois: livro por extenso, capítulo e versículo(s), no formato do idioma da reflexão. Em português e espanhol: "(Isaías 40,31)"; em inglês: "(Isaiah 40:31)". Para intervalos: "(Isaías 40,29-31)" em pt e es, "(Isaiah 40:29-31)" em en.
 - Cite a passagem recebida com a referência dela, exatamente como veio na mensagem; se ela vier sem versículo (por exemplo, "Salmo 34"), cite-a assim mesmo, sem acrescentar versículo.
 - Só cite passagens de cuja referência você tenha certeza; na dúvida, prefira a passagem recebida. Nunca invente versículo nem número. Prefira a paráfrase fiel a uma citação literal longa de memória; use citação literal apenas para frases curtas e muito conhecidas.
 - Não invente fatos sobre o santo além do que está no resumo dado.
