@@ -147,7 +147,15 @@ func TestValidateReflection(t *testing.T) {
 		"summary too long": {mut(func(r *domain.ReflectionRequest) { r.Saint.Summary = strings.Repeat("a", domain.MaxSummaryChars+1) }), domain.ErrInvalidReflection},
 		"context at limit": {mut(func(r *domain.ReflectionRequest) { r.Context = strings.Repeat("é", domain.MaxContextChars) }), nil},
 		"context too long": {mut(func(r *domain.ReflectionRequest) { r.Context = strings.Repeat("é", domain.MaxContextChars+1) }), domain.ErrInvalidReflection},
-		"language":         {mut(func(r *domain.ReflectionRequest) { r.Language = "fr" }), domain.ErrInvalidReflection},
+		"crisis without passage and saint": {mut(func(r *domain.ReflectionRequest) {
+			r.Crisis, r.Passage, r.Saint = true, domain.Passage{}, domain.Saint{}
+		}), nil},
+		"crisis keeps the limits": {mut(func(r *domain.ReflectionRequest) {
+			r.Crisis = true
+			r.Passage.Reference = strings.Repeat("a", domain.MaxLabelChars+1)
+		}), domain.ErrInvalidReflection},
+		"crisis still needs state": {mut(func(r *domain.ReflectionRequest) { r.Crisis = true; r.State = "" }), domain.ErrInvalidState},
+		"language":                 {mut(func(r *domain.ReflectionRequest) { r.Language = "fr" }), domain.ErrInvalidReflection},
 	}
 	for name, c := range cases {
 		if err := ValidateReflection(c.req); !errors.Is(err, c.want) && !(err == nil && c.want == nil) {

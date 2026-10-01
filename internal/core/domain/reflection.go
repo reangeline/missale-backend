@@ -24,6 +24,10 @@ type ReflectionRequest struct {
 	// Context is optional: the onboarding questionnaire answers, already in
 	// the app's language, one "Question: answer" per line. Never logged.
 	Context string `json:"context,omitempty"`
+	// Crisis is set when the app detected risk of suicide or self-harm: the
+	// reflection then speaks of God but clearly points to help, and Passage
+	// and Saint become optional.
+	Crisis bool `json:"crisis,omitempty"`
 	// Free has the same meaning as DecisionRequest.Free.
 	Free *bool `json:"free,omitempty"`
 }
