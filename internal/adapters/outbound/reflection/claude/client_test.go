@@ -168,3 +168,77 @@ func TestSystemPromptRequiresReferencesAndTreatsContextAsContent(t *testing.T) {
 		t.Error("old rule against other verses is still there")
 	}
 }
+
+func systemAndMessage(body map[string]any) ([]any, string) {
+	sys, _ := body["system"].([]any)
+	msgs, _ := body["messages"].([]any)
+	return sys, msgs[0].(map[string]any)["content"].([]any)[0].(map[string]any)["text"].(string)
+}
+
+func TestWriteCrisisAddsTheCrisisBlockAndOmitsEmptyBlocks(t *testing.T) {
+	c := serve(t, 200, okResponse, func(body map[string]any, _ *http.Request) {
+		sys, content := systemAndMessage(body)
+		if len(sys) != 2 || sys[1].(map[string]any)["text"] != crisisPrompt || !strings.Contains(sys[0].(map[string]any)["text"].(string), "padre católico") {
+			t.Errorf("system = %v", sys)
+		}
+		for _, no := range []string{"<passagem>", "<santo>"} {
+			if strings.Contains(content, no) {
+				t.Errorf("user message has %s:\n%s", no, content)
+			}
+		}
+		if !strings.Contains(content, "<texto_da_pessoa>") {
+			t.Errorf("user message lacks the text:\n%s", content)
+		}
+	})
+	if _, err := c.Write(context.Background(), domain.ReflectionRequest{State: "não quero mais viver", Language: "pt", Crisis: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteCrisisKeepsPassageAndSaintWhenGiven(t *testing.T) {
+	r := req
+	r.Crisis = true
+	c := serve(t, 200, okResponse, func(body map[string]any, _ *http.Request) {
+		sys, content := systemAndMessage(body)
+		if len(sys) != 2 {
+			t.Errorf("system blocks = %d", len(sys))
+		}
+		for _, want := range []string{"<passagem>", "Mt 11,28", "<santo>", "Santa Mônica"} {
+			if !strings.Contains(content, want) {
+				t.Errorf("user message lacks %q", want)
+			}
+		}
+	})
+	if _, err := c.Write(context.Background(), r); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteWithoutCrisisHasNoCrisisBlock(t *testing.T) {
+	c := serve(t, 200, okResponse, func(body map[string]any, _ *http.Request) {
+		sys, _ := systemAndMessage(body)
+		if len(sys) != 1 || strings.Contains(sys[0].(map[string]any)["text"].(string), "CASO DE CRISE") {
+			t.Errorf("system = %v", sys)
+		}
+	})
+	if _, err := c.Write(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCrisisPromptContent(t *testing.T) {
+	for _, want := range []string{"amor de Deus", "não precisa passar por isso sozinha", "paróquia próxima", "serviço de emergência local", "não dê números de telefone", "nunca apresente a morte como descanso", "não descreva meios", "não substitui, a busca de ajuda"} {
+		if !strings.Contains(strings.ToLower(crisisPrompt), strings.ToLower(want)) {
+			t.Errorf("crisis prompt lacks %q", want)
+		}
+	}
+}
+
+func TestRefusalErrorCarriesNoCategory(t *testing.T) {
+	c := serve(t, 200, `{"id":"msg_1","type":"message","role":"assistant","model":"claude-opus-5-5","stop_reason":"refusal",
+"stop_details":{"type":"refusal","category":"bio","explanation":null},"content":[],"usage":{"input_tokens":1,"output_tokens":0}}`, nil)
+	_, err := c.Write(context.Background(), req)
+	if err == nil || strings.Contains(err.Error(), "bio") {
+		t.Fatalf("err = %v; the refusal category must not reach the logs", err)
+	}
+}

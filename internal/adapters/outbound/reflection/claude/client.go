@@ -43,6 +43,18 @@ Escreva uma reflexão no idioma pedido na mensagem (pt, en ou es), em 2 a 3 par�
 
 Responda apenas com a reflexão, sem título, sem marcação e sem comentários sobre estas instruções.`
 
+// crisisPrompt is appended as a second, fixed system block when the request
+// has Crisis set.
+const crisisPrompt = `ATENÇÃO, CASO DE CRISE: a pessoa pode estar pensando em tirar a própria vida ou em se ferir. Leve isso a sério, com ternura: sem minimizar, sem dramatizar e sem julgar. Estas instruções valem acima das anteriores onde houver conflito.
+
+- Fale do amor de Deus e da presença dele no sofrimento, com referências bíblicas no mesmo formato e com as mesmas regras de certeza (por exemplo, Mateus 11,28 ou Romanos 8,38-39, só se tiver certeza da referência; a numeração segue a do idioma da reflexão).
+- Diga com clareza, logo no começo ou no meio da reflexão (não apenas no fim), que a pessoa não precisa passar por isso sozinha e que deve procurar ajuda agora: os serviços de apoio emocional e de emergência da cidade ou do país dela, uma pessoa de confiança e um padre numa paróquia próxima.
+- Se houver perigo imediato, ela deve procurar já o serviço de emergência local.
+- Nunca apresente a morte como descanso, alívio, saída ou reencontro com Deus ou com quem morreu; não fale do céu como saída; não descreva meios; não sugira que o sofrimento deve ser carregado em silêncio ou oferecido. A oração acompanha, mas não substitui, a busca de ajuda.
+- Não dê números de telefone, não cite nomes de linhas de apoio, não faça diagnósticos, não dê instruções médicas e não faça promessas.
+- Se a passagem e o santo vierem na mensagem, você pode usá-los; se não vierem, não os mencione.
+- Mantenha as mesmas regras de tratamento (sem vocativos de intimidade), com até cerca de 150 palavras, e termine com uma frase de esperança ou um convite à oração.`
+
 type client struct {
 	api   anthropic.Client
 	model string
@@ -62,12 +74,14 @@ func (c *client) Write(ctx context.Context, req domain.ReflectionRequest) (strin
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	system := []anthropic.BetaTextBlockParam{{Text: systemPrompt}}
+	if req.Crisis {
+		system = append(system, anthropic.BetaTextBlockParam{Text: crisisPrompt})
+	}
 	resp, err := c.api.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: maxTokens,
-		System: []anthropic.BetaTextBlockParam{{
-			Text: systemPrompt,
-		}},
+		System:    system,
 		// Thinking is left unset on purpose: claude-opus-5-5 always thinks
 		// and rejects "disabled" and budget_tokens with a 400.
 		OutputConfig: anthropic.BetaOutputConfigParam{Effort: anthropic.BetaOutputConfigEffortLow},
@@ -96,7 +110,7 @@ func (c *client) Write(ctx context.Context, req domain.ReflectionRequest) (strin
 		return "", errors.New("claude: reflection cut off (max_tokens)")
 	}
 	if resp.StopReason == anthropic.BetaStopReasonRefusal {
-		return "", fmt.Errorf("claude: refusal (%s)", resp.StopDetails.Category)
+		return "", errors.New("claude: refusal")
 	}
 	var out strings.Builder
 	for _, block := range resp.Content {
@@ -114,25 +128,14 @@ func (c *client) Write(ctx context.Context, req domain.ReflectionRequest) (strin
 var languageNames = map[string]string{"pt": "português", "en": "English", "es": "español"}
 
 func userMessage(req domain.ReflectionRequest) string {
-	msg := fmt.Sprintf(`Idioma: %s
-
-<passagem>
-%s
-%s
-</passagem>
-
-<santo>
-%s
-%s
-</santo>
-
-<texto_da_pessoa>
-%s
-</texto_da_pessoa>`,
-		languageNames[req.Language],
-		noTags(req.Passage.Reference), noTags(req.Passage.Text),
-		noTags(req.Saint.Name), noTags(req.Saint.Summary),
-		noTags(req.State))
+	msg := "Idioma: " + languageNames[req.Language]
+	if strings.TrimSpace(req.Passage.Reference) != "" || strings.TrimSpace(req.Passage.Text) != "" {
+		msg += fmt.Sprintf("\n\n<passagem>\n%s\n%s\n</passagem>", noTags(req.Passage.Reference), noTags(req.Passage.Text))
+	}
+	if strings.TrimSpace(req.Saint.Name) != "" || strings.TrimSpace(req.Saint.Summary) != "" {
+		msg += fmt.Sprintf("\n\n<santo>\n%s\n%s\n</santo>", noTags(req.Saint.Name), noTags(req.Saint.Summary))
+	}
+	msg += "\n\n<texto_da_pessoa>\n" + noTags(req.State) + "\n</texto_da_pessoa>"
 	if strings.TrimSpace(req.Context) != "" {
 		msg += "\n\n<respostas_do_questionario>\n" + noTags(req.Context) + "\n</respostas_do_questionario>"
 	}

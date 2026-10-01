@@ -57,7 +57,7 @@ func ValidateReflection(req domain.ReflectionRequest) error {
 		{req.Passage.Reference, domain.MaxLabelChars},
 		{req.Saint.Name, domain.MaxLabelChars},
 	} {
-		if strings.TrimSpace(f.s) == "" || utf8.RuneCountInString(f.s) > f.max {
+		if (strings.TrimSpace(f.s) == "" && !req.Crisis) || utf8.RuneCountInString(f.s) > f.max {
 			return domain.ErrInvalidReflection
 		}
 	}
