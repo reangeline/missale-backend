@@ -87,8 +87,9 @@ var Collections = []Collection{
 			{Key: "bioParagraphs", Label: "Biografia", Type: FieldParagraphs, Required: true},
 			{Key: "whyItMattersToday", Label: "Por que importa hoje", Type: FieldLongText, Required: true},
 			{Key: "prayer", Label: "Oração", Type: FieldLongText, Required: true},
-			{Key: "artworkName", Label: "Arte embutida (nome da imagem no app)", Type: FieldText, Help: "Só imagens que já vêm no app. Se houver arte enviada abaixo, ela vale mais."},
-			{Key: "artworkURL", Label: "Arte enviada", Type: FieldImage, Help: "JPEG, PNG ou WebP até 5 MB, de preferência quadrada e em domínio público. Vale mais que a arte embutida."},
+			{Key: "artworkName", Label: "Arte embutida (nome da imagem no app)", Type: FieldText, Help: "Só imagens que já vêm no app. As artes enviadas abaixo valem mais."},
+			{Key: "artworkURL", Label: "Arte quadrada — miniaturas", Type: FieldImage, Help: SquareArtworkHelp},
+			{Key: "wideArtworkURL", Label: "Arte larga — topo da ficha", Type: FieldImage, Help: WideArtworkHelp},
 			{Key: "stories", Label: "Histórias e milagres", Type: FieldItems, Help: "Cada uma com a sua fonte.", Subfields: []Field{
 				{Key: "title", Label: "Título", Type: FieldText, Required: true},
 				{Key: "body", Label: "Texto", Type: FieldLongText, Required: true},
@@ -185,9 +186,9 @@ func init() {
 	Collections = append(Collections, Collection{
 		Key:         "apparitions",
 		Label:       "Aparições marianas",
-		Description: "As aparições da aba Orações, na ordem em que aparecem. A arte vem do identificador (só as que já têm imagem no app).",
+		Description: "As aparições da aba Orações, na ordem em que aparecem.",
 		Fields: []Field{
-			{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: lourdes-1858. Com imagem no app: fatima-1917, guadalupe-1531, aparecida-1717, lourdes-1858, rue-du-bac-1830."},
+			{Key: "id", Label: "Identificador", Type: FieldText, Required: true, Help: "Único e fixo, ex.: lourdes-1858. Sem arte enviada, o app usa a embutida destas: fatima-1917, guadalupe-1531, aparecida-1717, lourdes-1858, rue-du-bac-1830."},
 			{Key: "name", Label: "Nome", Type: FieldText, Required: true},
 			{Key: "place", Label: "Lugar", Type: FieldText, Required: true},
 			{Key: "year", Label: "Ano", Type: FieldText, Required: true},
@@ -195,6 +196,8 @@ func init() {
 			{Key: "summary", Label: "Resumo", Type: FieldLongText, Required: true},
 			{Key: "ecclesialRecognition", Label: "Reconhecimento da Igreja", Type: FieldLongText, Required: true},
 			{Key: "source", Label: "Fonte", Type: FieldText, Required: true},
+			{Key: "artworkURL", Label: "Arte quadrada — miniaturas", Type: FieldImage, Help: SquareArtworkHelp},
+			{Key: "wideArtworkURL", Label: "Arte larga — topo da ficha", Type: FieldImage, Help: WideArtworkHelp},
 		},
 	})
 }
@@ -300,3 +303,12 @@ type AdminSession struct {
 	NewPasswordNeeded bool   `json:"newPasswordNeeded,omitempty"`
 	Session           string `json:"session,omitempty"`
 }
+
+// The app shows each saint and apparition in two shapes: a wide band at the
+// top of its page and small square thumbnails everywhere else. Each shape has
+// its own upload; the app falls back to the other one, then to the art that
+// ships inside it.
+const (
+	SquareArtworkHelp = "Quadrada, de preferência 1024×1024: listas, cartões e a tela Hoje. JPEG, PNG ou WebP até 5 MB, em domínio público. Vale mais que a arte embutida."
+	WideArtworkHelp   = "Larga, de preferência 1206×648: o topo da ficha. JPEG, PNG ou WebP até 5 MB, em domínio público. Sem ela, o topo usa a quadrada."
+)
